@@ -14,6 +14,7 @@ import {
     useSensors,
     closestCorners,
     DragMoveEvent,
+    useDroppable,
 } from '@dnd-kit/core';
 import {
     SortableContext,
@@ -27,7 +28,7 @@ import { v4 as uuidv4 } from 'uuid';
 // Enhanced component interface with better type safety
 interface TemplateComponent {
     id: string;
-    type: keyof typeof EmailComponents;
+    type: string;
     props: Record<string, any>;
     children?: TemplateComponent[];
     position?: {
@@ -52,6 +53,8 @@ interface TemplateComponent {
         fontWeight?: string;
         padding?: string;
         margin?: string;
+        marginBottom?: string;
+        gap?: string;
         border?: string;
         borderColor?: string;
         borderRadius?: string;
@@ -249,6 +252,15 @@ export default function EnhancedTemplateBuilder() {
     const [history, setHistory] = useState<TemplateComponent[][]>([[]]);
     const [historyIndex, setHistoryIndex] = useState(0);
 
+    const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+    const flashActionMessage = useCallback((message: string) => {
+        setActionMessage(message);
+        window.setTimeout(() => {
+            setActionMessage(null);
+        }, 1200);
+    }, []);
+
     useEffect(() => {
         try {
             const saved = localStorage.getItem(TEMPLATE_STORAGE_KEY);
@@ -266,10 +278,11 @@ export default function EnhancedTemplateBuilder() {
     const saveTemplate = useCallback(() => {
         try {
             localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(components));
+            flashActionMessage('Saved');
         } catch {
             // ignore
         }
-    }, [components]);
+    }, [components, flashActionMessage]);
 
     const loadTemplate = useCallback(() => {
         try {
@@ -282,10 +295,29 @@ export default function EnhancedTemplateBuilder() {
             setHistoryIndex(0);
             setSelectedComponent(null);
             setEditingComponent(null);
+            flashActionMessage('Loaded');
         } catch {
             // ignore
         }
-    }, []);
+    }, [flashActionMessage]);
+
+    const deleteTemplate = useCallback(() => {
+        try {
+            localStorage.removeItem(TEMPLATE_STORAGE_KEY);
+            flashActionMessage('Template deleted');
+        } catch {
+            // ignore
+        }
+    }, [flashActionMessage]);
+
+    const startNewTemplate = useCallback(() => {
+        setComponents([]);
+        setHistory([[]]);
+        setHistoryIndex(0);
+        setSelectedComponent(null);
+        setEditingComponent(null);
+        flashActionMessage('New template started');
+    }, [flashActionMessage]);
 
     // Mouse interaction state with proper typing
     const [isDragging, setIsDragging] = useState(false);
@@ -382,16 +414,18 @@ export default function EnhancedTemplateBuilder() {
                 },
                 size: DEFAULT_COMPONENT_SIZES.Button,
                 style: {
-                    backgroundColor: '#3b82f6',
-                    textColor: '#ffffff',
-                    padding: '8px 16px', // Reduced padding
-                    borderRadius: '4px',
+                    backgroundColor: '#ffffff',
+                    textColor: '#3b82f6',
+                    padding: '12px 24px',
+                    borderRadius: '6px',
                     fontSize: '14px',
                     fontWeight: '600',
                     textAlign: 'center',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    border: '2px solid #3b82f6',
+                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
                 },
                 constraints: { aspectRatio: 3, lockAspectRatio: false }
             },
@@ -403,25 +437,28 @@ export default function EnhancedTemplateBuilder() {
                 },
                 size: DEFAULT_COMPONENT_SIZES.Text,
                 style: {
-                    textColor: '#1f2937',
-                    fontSize: '14px',
-                    lineHeight: '1.4',
-                    padding: '6px', // Reduced padding
-                    backgroundColor: 'transparent',
-                    textAlign: 'center',
+                    textColor: '#1e293b',
+                    fontSize: '16px',
+                    lineHeight: '1.6',
+                    padding: '12px',
+                    backgroundColor: '#f8fafc',
+                    textAlign: 'left',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'flex-start',
+                    borderRadius: '6px',
+                    border: '1px solid #e2e8f0'
                 }
             },
             Section: {
                 props: { children: 'Section content', padding: 'md' },
                 size: DEFAULT_COMPONENT_SIZES.Section,
                 style: {
-                    backgroundColor: '#ffffff',
-                    padding: '12px', // Reduced padding
-                    borderRadius: '6px',
-                    border: '1px solid #e5e7eb'
+                    backgroundColor: '#f0f9ff',
+                    padding: '32px',
+                    borderRadius: '12px',
+                    border: '2px solid #bae6fd',
+                    boxShadow: '0 4px 6px rgba(59, 130, 246, 0.1)'
                 }
             },
             Image: {
@@ -437,40 +474,44 @@ export default function EnhancedTemplateBuilder() {
                 props: {
                     title: 'Email Header',
                     subtitle: 'Welcome',
-                    logo: 'https://via.placeholder.com/80x30'
+                    logo: 'https://via.placeholder.com/120x40/3b82f6/ffffff?text=LOGO'
                 },
                 size: DEFAULT_COMPONENT_SIZES.Header,
                 style: {
-                    backgroundColor: '#ffffff',
-                    textColor: '#1f2937',
-                    padding: '12px', // Reduced padding
-                    borderBottom: '2px solid #3b82f6'
+                    backgroundColor: '#1e293b',
+                    textColor: '#ffffff',
+                    padding: '24px',
+                    textAlign: 'center',
+                    border: '2px solid #334155',
+                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)'
                 }
             },
             Footer: {
                 props: {
                     company: 'Your Company',
                     address: '123 Main St',
-                    copyright: `© ${new Date().getFullYear()}`
+                    unsubscribeLink: 'https://example.com/unsubscribe'
                 },
                 size: DEFAULT_COMPONENT_SIZES.Footer,
                 style: {
-                    backgroundColor: '#f8fafc',
-                    textColor: '#6b7280',
-                    padding: '12px', // Reduced padding
+                    backgroundColor: '#1e293b',
+                    textColor: '#94a3b8',
+                    padding: '24px',
                     fontSize: '12px',
-                    textAlign: 'center'
+                    textAlign: 'center',
+                    border: '2px solid #334155',
+                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.2)'
                 }
             },
             Card: {
                 props: { children: 'Card content' },
                 size: DEFAULT_COMPONENT_SIZES.Card,
                 style: {
-                    backgroundColor: '#ffffff',
-                    padding: '12px', // Reduced padding
-                    borderRadius: '8px',
-                    border: '1px solid #e5e7eb',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    backgroundColor: '#fef3c7',
+                    padding: '20px',
+                    borderRadius: '12px',
+                    border: '2px solid #f59e0b',
+                    boxShadow: '0 4px 6px rgba(245, 158, 11, 0.15)',
                     textAlign: 'center',
                     display: 'flex',
                     alignItems: 'center',
@@ -481,8 +522,10 @@ export default function EnhancedTemplateBuilder() {
                 props: { color: '#e5e7eb', thickness: '2px', spacing: '12px' },
                 size: DEFAULT_COMPONENT_SIZES.Divider,
                 style: {
-                    backgroundColor: '#e5e7eb',
-                    margin: '12px 0'
+                    backgroundColor: '#cbd5e1',
+                    margin: '12px 0',
+                    height: '2px',
+                    borderRadius: '1px'
                 }
             },
             SocialLinks: {
@@ -497,7 +540,11 @@ export default function EnhancedTemplateBuilder() {
                 },
                 size: DEFAULT_COMPONENT_SIZES.SocialLinks,
                 style: {
-                    padding: '4px',
+                    padding: '16px',
+                    backgroundColor: '#f0fdf4',
+                    border: '2px solid #86efac',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 4px rgba(34, 197, 94, 0.15)'
                 }
             }
         };
@@ -514,7 +561,7 @@ export default function EnhancedTemplateBuilder() {
 
         return {
             id: uuidv4(),
-            type: componentType as keyof typeof EmailComponents,
+            type: componentType,
             props: config.props,
             children: [],
             position: position || { x: 10, y: 10 + components.length * 15 },
@@ -539,6 +586,225 @@ export default function EnhancedTemplateBuilder() {
         };
     }, [components]);
 
+    // Create sample template
+    const createSampleTemplate = useCallback(() => {
+        // Clear existing components first
+        setComponents([]);
+        setHistory([[]]);
+        setHistoryIndex(0);
+
+        const sampleComponents: TemplateComponent[] = [];
+
+        // Header with branding
+        const header = createComponent('Header', undefined, { x: 10, y: 10 });
+        header.props = {
+            title: 'TechCorp Solutions',
+            subtitle: 'Innovating Tomorrow, Today',
+            logo: 'https://via.placeholder.com/120x40/3b82f6/ffffff?text=LOGO'
+        };
+        header.style = {
+            ...header.style,
+            backgroundColor: '#1e293b',
+            textColor: '#ffffff',
+            padding: '24px',
+            textAlign: 'center'
+        };
+        header.size = { width: 580, height: 100 };
+        sampleComponents.push(header);
+
+        // Hero section with image and text side-by-side
+        const heroSection = createComponent('Section', undefined, { x: 10, y: 130 });
+        heroSection.style = {
+            ...heroSection.style,
+            backgroundColor: '#f8fafc',
+            padding: '32px'
+        };
+        heroSection.size = { width: 580, height: 250 };
+        sampleComponents.push(heroSection);
+
+        // Hero row for side-by-side layout
+        const heroRow = createComponent('Row', heroSection.id, { x: 0, y: 0 });
+        heroRow.style = {
+            ...heroRow.style,
+            gap: '24px'
+        };
+        heroRow.size = { width: 516, height: 186 }; // Account for padding
+        sampleComponents.push(heroRow);
+
+        // Hero image
+        const heroImage = createComponent('Image', heroRow.id, { x: 0, y: 0 });
+        heroImage.props = {
+            src: 'https://via.placeholder.com/300x200/3b82f6/ffffff?text=Product+Demo',
+            alt: 'Product Demo'
+        };
+        heroImage.size = { width: 240, height: 160 };
+        sampleComponents.push(heroImage);
+
+        // Hero text content
+        const heroText = createComponent('Text', heroRow.id, { x: 0, y: 0 });
+        heroText.props = {
+            children: 'Transform your business with our cutting-edge solutions. Experience the power of innovation and take your organization to new heights with our comprehensive suite of tools and services.'
+        };
+        heroText.style = {
+            ...heroText.style,
+            fontSize: '16px',
+            textColor: '#334155',
+            textAlign: 'left',
+            lineHeight: '1.6'
+        };
+        heroText.size = { width: 240, height: 160 };
+        sampleComponents.push(heroText);
+
+        // Features section
+        const featuresSection = createComponent('Section', undefined, { x: 10, y: 400 });
+        featuresSection.style = {
+            ...featuresSection.style,
+            backgroundColor: '#ffffff',
+            padding: '32px'
+        };
+        featuresSection.size = { width: 580, height: 300 };
+        sampleComponents.push(featuresSection);
+
+        // Features title
+        const featuresTitle = createComponent('Text', featuresSection.id, { x: 0, y: 0 });
+        featuresTitle.props = {
+            children: 'Why Choose Us?'
+        };
+        featuresTitle.style = {
+            ...featuresTitle.style,
+            fontSize: '24px',
+            fontWeight: 'bold',
+            textColor: '#1e293b',
+            textAlign: 'center',
+            marginBottom: '24px'
+        };
+        featuresTitle.size = { width: 516, height: 40 };
+        sampleComponents.push(featuresTitle);
+
+        // Features row
+        const featuresRow = createComponent('Row', featuresSection.id, { x: 0, y: 50 });
+        featuresRow.style = {
+            ...featuresRow.style,
+            gap: '16px'
+        };
+        featuresRow.size = { width: 516, height: 200 };
+        sampleComponents.push(featuresRow);
+
+        // Feature cards
+        const features = [
+            { title: 'Fast Performance', desc: 'Lightning-fast processing', color: '#10b981' },
+            { title: 'Secure Platform', desc: 'Enterprise-grade security', color: '#3b82f6' },
+            { title: '24/7 Support', desc: 'Always here to help', color: '#f59e0b' }
+        ];
+
+        features.forEach((feature, index) => {
+            const card = createComponent('Card', featuresRow.id, { x: 0, y: 0 });
+            card.style = {
+                ...card.style,
+                backgroundColor: feature.color + '10',
+                border: `2px solid ${feature.color}20`,
+                borderRadius: '8px',
+                padding: '20px'
+            };
+            card.size = { width: 160, height: 180 };
+            sampleComponents.push(card);
+
+            const cardTitle = createComponent('Text', card.id, { x: 0, y: 0 });
+            cardTitle.props = {
+                children: feature.title
+            };
+            cardTitle.style = {
+                ...cardTitle.style,
+                fontSize: '18px',
+                fontWeight: 'bold',
+                textColor: feature.color,
+                textAlign: 'center',
+                marginBottom: '8px'
+            };
+            cardTitle.size = { width: 120, height: 30 };
+            sampleComponents.push(cardTitle);
+
+            const cardDesc = createComponent('Text', card.id, { x: 0, y: 40 });
+            cardDesc.props = {
+                children: feature.desc
+            };
+            cardDesc.style = {
+                ...cardDesc.style,
+                fontSize: '14px',
+                textColor: '#64748b',
+                textAlign: 'center'
+            };
+            cardDesc.size = { width: 120, height: 40 };
+            sampleComponents.push(cardDesc);
+        });
+
+        // CTA section
+        const ctaSection = createComponent('Section', undefined, { x: 10, y: 720 });
+        ctaSection.style = {
+            ...ctaSection.style,
+            backgroundColor: '#3b82f6',
+            padding: '32px',
+            textAlign: 'center'
+        };
+        ctaSection.size = { width: 580, height: 150 };
+        sampleComponents.push(ctaSection);
+
+        const ctaText = createComponent('Text', ctaSection.id, { x: 0, y: 0 });
+        ctaText.props = {
+            children: 'Ready to get started?'
+        };
+        ctaText.style = {
+            ...ctaText.style,
+            fontSize: '20px',
+            fontWeight: 'bold',
+            textColor: '#ffffff',
+            textAlign: 'center',
+            marginBottom: '16px'
+        };
+        ctaText.size = { width: 516, height: 30 };
+        sampleComponents.push(ctaText);
+
+        const ctaButton = createComponent('Button', ctaSection.id, { x: 0, y: 50 });
+        ctaButton.props = {
+            children: 'Start Free Trial',
+            href: '#'
+        };
+        ctaButton.style = {
+            ...ctaButton.style,
+            backgroundColor: '#ffffff',
+            textColor: '#3b82f6',
+            borderRadius: '6px',
+            padding: '12px 24px'
+        };
+        ctaButton.size = { width: 150, height: 50 };
+        sampleComponents.push(ctaButton);
+
+        // Footer
+        const footer = createComponent('Footer', undefined, { x: 10, y: 890 });
+        footer.props = {
+            company: 'TechCorp Solutions',
+            address: '123 Business Ave, Suite 100, San Francisco, CA 94105',
+            unsubscribeLink: '#unsubscribe'
+        };
+        footer.style = {
+            ...footer.style,
+            backgroundColor: '#1e293b',
+            textColor: '#94a3b8',
+            padding: '24px',
+            textAlign: 'center'
+        };
+        footer.size = { width: 580, height: 120 };
+        sampleComponents.push(footer);
+
+        // Set all components at once
+        setComponents(sampleComponents);
+        setHistory([sampleComponents]);
+        setHistoryIndex(0);
+        setSelectedComponent(null);
+        setEditingComponent(null);
+        flashActionMessage('Sample template created');
+    }, [createComponent, flashActionMessage]);
+
     // Enhanced add component with smart positioning
     const addComponent = useCallback((
         componentType: string,
@@ -546,22 +812,46 @@ export default function EnhancedTemplateBuilder() {
         position?: { x: number; y: number }
     ) => {
         const newComponent = createComponent(componentType, parentId, position);
+        const newComponents = [newComponent];
+
+        // If creating a Card, add nested Text components like the sample template
+        if (componentType === 'Card') {
+            const cardTitle = createComponent('Text', newComponent.id, { x: 0, y: 0 });
+            cardTitle.props = {
+                children: 'Card Title'
+            };
+            cardTitle.style = {
+                ...cardTitle.style,
+                fontSize: '18px',
+                fontWeight: 'bold',
+                textColor: '#f59e0b',
+                textAlign: 'center',
+                marginBottom: '8px'
+            };
+            cardTitle.size = { width: 120, height: 30 };
+            newComponents.push(cardTitle);
+
+            const cardDesc = createComponent('Text', newComponent.id, { x: 0, y: 40 });
+            cardDesc.props = {
+                children: 'Card description text goes here'
+            };
+            cardDesc.style = {
+                ...cardDesc.style,
+                fontSize: '14px',
+                textColor: '#64748b',
+                textAlign: 'center'
+            };
+            cardDesc.size = { width: 120, height: 40 };
+            newComponents.push(cardDesc);
+        }
 
         setComponents(prev => {
-            const updated = [...prev, newComponent];
+            const updated = [...prev, ...newComponents];
             saveToHistory(updated);
             return updated;
         });
 
         setSelectedComponent(newComponent.id);
-
-        if (parentId) {
-            setComponents(prev => prev.map(comp =>
-                comp.id === parentId
-                    ? { ...comp, children: [...(comp.children || []), newComponent] }
-                    : comp
-            ));
-        }
     }, [createComponent, saveToHistory]);
 
     // Enhanced update component with placeholder text fix
@@ -593,31 +883,17 @@ export default function EnhancedTemplateBuilder() {
             const component = prev.find(c => c.id === id);
             if (!component) return prev;
 
-            // Remove all children recursively
-            const removeChildren = (compId: string): string[] => {
-                const comp = prev.find(c => c.id === compId);
-                if (!comp?.children?.length) return [compId];
-
+            // Remove all descendants via parentId (more reliable than maintaining nested arrays)
+            const collectDescendants = (rootId: string): string[] => {
+                const directChildren = prev.filter(c => c.parentId === rootId);
                 return [
-                    compId,
-                    ...comp.children.flatMap(child => removeChildren(child.id))
+                    rootId,
+                    ...directChildren.flatMap(child => collectDescendants(child.id))
                 ];
             };
 
-            const idsToRemove = removeChildren(id);
+            const idsToRemove = collectDescendants(id);
             const updated = prev.filter(c => !idsToRemove.includes(c.id));
-
-            // Remove from parent's children
-            if (component.parentId) {
-                const parent = updated.find(c => c.id === component.parentId);
-                if (parent) {
-                    const updatedParent = {
-                        ...parent,
-                        children: parent.children?.filter(child => child.id !== id) || []
-                    };
-                    updated[updated.findIndex(c => c.id === component.parentId)] = updatedParent;
-                }
-            }
 
             saveToHistory(updated);
             return updated;
@@ -627,6 +903,51 @@ export default function EnhancedTemplateBuilder() {
             setSelectedComponent(null);
         }
     }, [saveToHistory, selectedComponent]);
+
+    const setComponentParent = useCallback((childId: string, parentId?: string) => {
+        setComponents(prev => {
+            const child = prev.find(c => c.id === childId);
+            if (!child) return prev;
+
+            const nextParentId = parentId || undefined;
+            if (child.parentId === nextParentId) return prev;
+
+            const findNestLevel = (pid?: string): number => {
+                if (!pid) return 0;
+                const p = prev.find(c => c.id === pid);
+                if (!p) return 0;
+                return (p.nestLevel || 0) + 1;
+            };
+
+            const updated = prev.map(c => {
+                if (c.id === childId) {
+                    return {
+                        ...c,
+                        parentId: nextParentId,
+                        nestLevel: findNestLevel(nextParentId),
+                    };
+                }
+                return c;
+            });
+
+            // Update descendants' nest levels for consistency
+            const byId = new Map(updated.map(c => [c.id, c] as const));
+            const updateSubtree = (rootId: string) => {
+                const root = byId.get(rootId);
+                if (!root) return;
+                const children = updated.filter(c => c.parentId === rootId);
+                children.forEach(ch => {
+                    byId.set(ch.id, { ...ch, nestLevel: (root.nestLevel || 0) + 1 });
+                    updateSubtree(ch.id);
+                });
+            };
+            updateSubtree(childId);
+
+            const finalList = Array.from(byId.values());
+            saveToHistory(finalList);
+            return finalList;
+        });
+    }, [saveToHistory]);
 
     // Enhanced position update with safe area boundary
     const updateComponentPosition = useCallback((
@@ -739,7 +1060,9 @@ export default function EnhancedTemplateBuilder() {
             const x = pointerX - dragOffset.x;
             const y = pointerY - dragOffset.y;
 
-            setDragGuides({ x, y });
+            const w = component.size?.width || 150;
+            const h = component.size?.height || 100;
+            setDragGuides({ x: x + w / 2, y: y + h / 2 });
 
             // Update position with boundary checking
             updateComponentPosition(selectedComponent, x, y);
@@ -876,6 +1199,11 @@ export default function EnhancedTemplateBuilder() {
         const dropX = (activatorEvent.clientX - canvasBoundaries.left) / canvasScale;
         const dropY = (activatorEvent.clientY - canvasBoundaries.top) / canvasScale;
 
+        const overComponent = typeof over.id === 'string'
+            ? components.find(c => c.id === over.id)
+            : undefined;
+        const overIsContainer = !!overComponent && ['Section', 'Card', 'Row'].includes(overComponent.type);
+
         if (typeof active.id === 'string' && active.id.startsWith('library-')) {
             // Adding new component from library
             const componentType = active.id.replace('library-', '');
@@ -898,11 +1226,15 @@ export default function EnhancedTemplateBuilder() {
                 finalY = Math.round(adjustedY / GRID_SIZE) * GRID_SIZE;
             }
 
-            addComponent(componentType, undefined, { x: finalX, y: finalY });
+            addComponent(componentType, overIsContainer ? (over.id as string) : undefined, { x: finalX, y: finalY });
         } else if (over.id === 'canvas') {
             // Moving existing component
             const component = components.find(c => c.id === active.id);
             if (component) {
+                // If it was nested, detatch it when dropped back onto the canvas
+                if (component.parentId) {
+                    setComponentParent(component.id, undefined);
+                }
                 // Apply safe area constraints
                 const compWidth = component.size?.width || 150;
                 const compHeight = component.size?.height || 100;
@@ -923,184 +1255,377 @@ export default function EnhancedTemplateBuilder() {
 
                 updateComponentPosition(active.id as string, finalX, finalY);
             }
+        } else if (overIsContainer && typeof active.id === 'string') {
+            // Nest existing component into a container
+            setComponentParent(active.id as string, over.id as string);
         }
 
         setActiveComponent(null);
-    }, [addComponent, components, getCanvasBoundaries, snapToGrid, updateComponentPosition]);
+    }, [addComponent, components, getCanvasBoundaries, snapToGrid, updateComponentPosition, canvasScale, setComponentParent]);
 
-    // Enhanced HTML generation
+    // Email-safe HTML generation (table based for Gmail/Outlook)
     const generateHtml = useCallback(() => {
-        const generateComponentHtml = (component: TemplateComponent): string => {
-            try {
-                const style = component.style || {};
-                const size = component.size || getDefaultComponentSize(component.type as string);
+        const buildComponentTree = (flat: TemplateComponent[]) => {
+            const map = new Map<string, TemplateComponent>();
+            flat.forEach(c => map.set(c.id, { ...c, children: [] }));
+            map.forEach(node => {
+                if (node.parentId && map.has(node.parentId)) {
+                    map.get(node.parentId)!.children!.push(node);
+                }
+            });
+            return Array.from(map.values()).filter(n => !n.parentId || !map.has(n.parentId));
+        };
 
-                let html = '';
+        const css = (v: any, fallback: string) => {
+            if (typeof v === 'number') return `${v}px`;
+            if (typeof v === 'string' && v.trim().length > 0) return v;
+            return fallback;
+        };
 
-                switch (component.type) {
-                    case 'Section':
-                        html = `
-                <div style="
-                  width: ${size.width}px;
-                  background-color: ${style.backgroundColor || '#ffffff'};
-                  padding: ${style.padding || '12px'};
-                  margin: ${style.margin || '0'};
-                  border-radius: ${style.borderRadius || '0'};
-                  border: ${style.border || 'none'};
-                ">
-                  ${component.children?.map(generateComponentHtml).join('') || component.props.children || ''}
-                </div>
-              `;
-                        break;
+        const esc = (value: any) => {
+            const s = String(value ?? '');
+            return s
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        };
 
-                    case 'Text':
-                        html = `
-                <div style="
-                  color: ${style.textColor || '#000000'};
-                  font-size: ${style.fontSize || '14px'};
-                  font-family: ${style.fontFamily || 'Arial, sans-serif'};
-                  font-weight: ${style.fontWeight || 'normal'};
-                  text-align: ${style.textAlign || 'left'};
-                  line-height: ${style.lineHeight || '1.4'};
-                  padding: ${style.padding || '6px'};
-                  margin: ${style.margin || '0'};
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  min-height: ${size.height}px;
-                ">
-                  ${component.props.children || ''}
-                </div>
-              `;
-                        break;
+        const textAlign = (style: any) => {
+            const ta = style?.textAlign || 'left';
+            return ta === 'center' || ta === 'right' || ta === 'justify' ? ta : 'left';
+        };
 
-                    case 'Card':
-                        html = `
-                <div style="
-                  width: ${size.width}px;
-                  height: ${size.height}px;
-                  background-color: ${style.backgroundColor || '#ffffff'};
-                  padding: ${style.padding || '12px'};
-                  margin: ${style.margin || '0'};
-                  border-radius: ${style.borderRadius || '8px'};
-                  border: ${style.border || '1px solid #e5e7eb'};
-                  box-shadow: ${style.boxShadow || '0 1px 3px rgba(0,0,0,0.1)'};
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  text-align: center;
-                ">
-                  ${component.props.children || ''}
-                </div>
-              `;
-                        break;
+        // Group root-level components by horizontal position for side-by-side layout
+        const groupComponentsIntoRows = (components: TemplateComponent[]): TemplateComponent[][] => {
+            if (components.length === 0) return [];
 
-                    case 'Button':
-                        html = `
-                <a href="${component.props.href || '#'}" style="
-                  display: inline-block;
-                  background-color: ${style.backgroundColor || '#3b82f6'};
-                  color: ${style.textColor || '#ffffff'};
-                  padding: ${style.padding || '8px 16px'};
-                  border-radius: ${style.borderRadius || '4px'};
-                  font-size: ${style.fontSize || '14px'};
-                  font-weight: ${style.fontWeight || '600'};
-                  text-decoration: none;
-                  text-align: center;
-                  border: none;
-                  cursor: pointer;
-                  min-width: ${size.width}px;
-                  min-height: ${size.height}px;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                ">
-                  ${component.props.children || ''}
-                </a>
-              `;
-                        break;
+            // Sort components by Y position, then by X position
+            const sorted = [...components].sort((a, b) => {
+                const yDiff = (a.position?.y || 0) - (b.position?.y || 0);
+                if (Math.abs(yDiff) < 20) { // If Y positions are close, sort by X
+                    return (a.position?.x || 0) - (b.position?.x || 0);
+                }
+                return yDiff;
+            });
 
-                    case 'Image':
-                        html = `
-            <img 
-              src="${component.props.src}" 
-              alt="${component.props.alt || ''}" 
-              style="
-                max-width: 100%;
-                height: auto;
-                border-radius: ${style.borderRadius || '0'};
-                display: block;
-              "
-            />
-          `;
-                        break;
+            const rows: TemplateComponent[][] = [];
+            let currentRow: TemplateComponent[] = [sorted[0]];
+            let lastY = sorted[0].position?.y || 0;
 
-                    default:
-                        html = `<div>${component.type} Component</div>`;
+            for (let i = 1; i < sorted.length; i++) {
+                const comp = sorted[i];
+                const compY = comp.position?.y || 0;
+
+                // If Y position is significantly different, start a new row
+                if (Math.abs(compY - lastY) > 40) {
+                    rows.push(currentRow);
+                    currentRow = [comp];
+                    lastY = compY;
+                } else {
+                    currentRow.push(comp);
+                }
+            }
+
+            if (currentRow.length > 0) {
+                rows.push(currentRow);
+            }
+
+            return rows;
+        };
+
+        const renderNode = (component: TemplateComponent): string => {
+            const style = component.style || {};
+            const size = component.size || getDefaultComponentSize(component.type);
+            const childrenHtml = (component.children || []).map(renderNode).join('');
+
+            switch (component.type) {
+                case 'Section':
+                    return `
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                        <tr>
+                          <td style="background-color:${style.backgroundColor || '#ffffff'};padding:${css(style.padding, '16px')};border-radius:${css(style.borderRadius, '0')};border:${style.border || '0'};box-sizing:border-box;">
+                            ${childrenHtml || esc(component.props.children || '')}
+                          </td>
+                        </tr>
+                      </table>
+                    `;
+
+                case 'Row': {
+                    const cols = component.children || [];
+                    const gap = css(style.gap, '8px');
+                    const colWidth = cols.length > 0 ? `${Math.floor(100 / cols.length)}%` : '100%';
+                    const colsHtml = cols.map((child, idx) => {
+                        const rightPad = idx === cols.length - 1 ? '0' : gap;
+                        return `
+                          <td valign="top" width="${colWidth}" style="padding-right:${rightPad};box-sizing:border-box;">
+                            ${renderNode(child)}
+                          </td>
+                        `;
+                    }).join('');
+                    return `
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                        <tr>
+                          ${colsHtml}
+                        </tr>
+                      </table>
+                    `;
                 }
 
-                return html;
-            } catch (error) {
-                console.error('Error generating HTML for component:', component.type, error);
-                return `<div>Error rendering ${component.type} component</div>`;
+                case 'Column':
+                    return `
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                        <tr>
+                          <td valign="top" style="box-sizing:border-box;">
+                            ${childrenHtml || esc(component.props.children || '')}
+                          </td>
+                        </tr>
+                      </table>
+                    `;
+
+                case 'Card': {
+                    const bg = style.backgroundColor || '#ffffff';
+                    return `
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;border-spacing:0;background-color:${bg};border:${style.border || '1px solid #e5e7eb'};border-radius:${css(style.borderRadius, '8px')};">
+                        <tr>
+                          <td style="padding:${css(style.padding, '16px')};text-align:${textAlign(style)};box-sizing:border-box;">
+                            ${childrenHtml || esc(component.props.children || '')}
+                          </td>
+                        </tr>
+                      </table>
+                    `;
+                }
+
+                case 'Text':
+                    return `
+                      <div style="color:${style.textColor || '#111827'};font-size:${style.fontSize || '14px'};font-family:${style.fontFamily || 'Arial, sans-serif'};font-weight:${style.fontWeight || 'normal'};text-align:${textAlign(style)};line-height:${style.lineHeight || '1.5'};padding:${css(style.padding, '0')};margin:${css(style.margin, '0')};">
+                        ${component.props.children || ''}
+                      </div>
+                    `;
+
+                case 'Button': {
+                    const align = textAlign(style);
+                    const href = String(component.props?.href || '#');
+                    const label = component.props?.children || '';
+                    const bg = style.backgroundColor || '#3b82f6';
+                    const fg = style.textColor || '#ffffff';
+                    const pad = css(style.padding, '12px 16px');
+
+                    return `
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                        <tr>
+                          <td align="${align}" style="padding:${css(style.margin, '8px 0')};">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                              <tr>
+                                <td bgcolor="${bg}" style="border-radius:${css(style.borderRadius, '6px')};">
+                                  <a href="${href}" target="_blank" style="display:inline-block;padding:${pad};color:${fg};text-decoration:none;font-family:${style.fontFamily || 'Arial, sans-serif'};font-size:${style.fontSize || '14px'};font-weight:${style.fontWeight || '600'};">
+                                    ${label}
+                                  </a>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+                    `;
+                }
+
+                case 'Image': {
+                    const src = String(component.props?.src || '');
+                    const alt = esc(component.props?.alt || '');
+                    const maxW = size.width ? `${size.width}px` : '600px';
+                    return `
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                        <tr>
+                          <td style="padding:${css(style.margin, '8px 0')};">
+                            <img src="${src}" alt="${alt}" style="display:block;width:100%;max-width:${maxW};height:auto;border:0;outline:none;text-decoration:none;border-radius:${css(style.borderRadius, '0')};" />
+                          </td>
+                        </tr>
+                      </table>
+                    `;
+                }
+
+                case 'SocialLinks': {
+                    const links = Array.isArray(component.props?.links) ? component.props.links : [];
+                    const align = component.props?.align || style.textAlign || 'left';
+                    const tableAlign = align === 'center' ? 'center' : align === 'right' ? 'right' : 'left';
+                    const iconSize = component.props?.size === 'lg' ? 24 : component.props?.size === 'sm' ? 16 : 20;
+
+                    const getFallbackDomain = (platform: string) => {
+                        const p = platform.trim().toLowerCase();
+                        if (p === 'x' || p === 'twitter') return 'x.com';
+                        if (p === 'linkedin') return 'linkedin.com';
+                        if (p === 'facebook') return 'facebook.com';
+                        if (p === 'instagram') return 'instagram.com';
+                        if (p === 'youtube') return 'youtube.com';
+                        if (p === 'github') return 'github.com';
+                        return '';
+                    };
+
+                    const getDomainFromUrl = (url: string) => {
+                        try {
+                            const u = new URL(url);
+                            return u.hostname;
+                        } catch {
+                            return '';
+                        }
+                    };
+
+                    const getIconUrl = (platform: string, url: string) => {
+                        const domain = getDomainFromUrl(url) || getFallbackDomain(platform);
+                        if (!domain) return '';
+                        return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
+                    };
+
+                    const linkHtml = links.map((link: any, idx: number) => {
+                        const platform = String(link?.platform || 'Link');
+                        const url = String(link?.url || '#');
+                        const icon = link?.icon || getIconUrl(platform, url);
+                        const pr = idx === links.length - 1 ? '0' : '8px';
+                        if (icon) {
+                            return `
+                              <td style="padding-right:${pr};">
+                                <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;text-decoration:none;">
+                                  <img src="${icon}" alt="${platform}" width="${iconSize}" height="${iconSize}" style="display:block;border-radius:9999px;border:0;outline:none;text-decoration:none;" />
+                                </a>
+                              </td>
+                            `;
+                        }
+
+                        return `
+                          <td style="padding-right:${pr};font-family:Arial,sans-serif;font-size:12px;">
+                            <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;text-decoration:none;color:${style.textColor || '#2563eb'};">
+                              ${platform}
+                            </a>
+                          </td>
+                        `;
+                    }).join('');
+
+                    return `
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="${tableAlign}" style="border-collapse:collapse;">
+                        <tr>
+                          ${linkHtml}
+                        </tr>
+                      </table>
+                    `;
+                }
+
+                case 'Header': {
+                    const title = String(component.props?.title || '');
+                    const subtitle = String(component.props?.subtitle || '');
+                    const logo = String(component.props?.logo || '');
+                    const bg = style.backgroundColor || component.props?.backgroundColor || '#ffffff';
+                    const fg = style.textColor || component.props?.textColor || '#111827';
+
+                    return `
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:${bg};">
+                        <tr>
+                          <td style="padding:${css(style.padding, '16px')};text-align:${textAlign(style)};">
+                            ${logo ? `<div style=\"margin-bottom:8px;\"><img src=\"${logo}\" alt=\"\" style=\"display:inline-block;max-width:120px;height:auto;border:0;\" /></div>` : ''}
+                            ${title ? `<div style=\"font-size:20px;font-weight:700;color:${fg};font-family:${style.fontFamily || 'Arial, sans-serif'};\">${esc(title)}</div>` : ''}
+                            ${subtitle ? `<div style=\"font-size:14px;color:${fg};opacity:0.85;font-family:${style.fontFamily || 'Arial, sans-serif'};margin-top:4px;\">${esc(subtitle)}</div>` : ''}
+                          </td>
+                        </tr>
+                      </table>
+                    `;
+                }
+
+                case 'Footer': {
+                    const company = String(component.props?.company || '');
+                    const address = String(component.props?.address || '');
+                    const unsubscribeLink = String(component.props?.unsubscribeLink || '');
+                    const bg = style.backgroundColor || component.props?.backgroundColor || '#f8f9fa';
+                    const fg = style.textColor || component.props?.textColor || '#6b7280';
+
+                    return `
+                      <div style="background-color:${bg};color:${fg};padding:${css(style.padding, '16px')};text-align:${textAlign(style)};font-family:${style.fontFamily || 'Arial, sans-serif'};font-size:${style.fontSize || '12px'};box-sizing:border-box;">
+                        ${company ? `<div style=\"font-weight:600;font-size:14px;margin-bottom:4px;\">${esc(company)}</div>` : ''}
+                        ${address ? `<div style=\"font-size:12px;opacity:0.85;margin-bottom:8px;\">${esc(address)}</div>` : ''}
+                        ${unsubscribeLink ? `<div style=\"font-size:11px;opacity:0.75;\"><a href=\"${unsubscribeLink}\" style=\"color:${fg};text-decoration:underline;\">Unsubscribe</a></div>` : ''}
+                        <div style="font-size:11px;opacity:0.6;margin-top:10px;padding-top:10px;border-top:1px solid ${fg}30;">&copy; ${new Date().getFullYear()} ${esc(company || 'Company')}. All rights reserved.</div>
+                      </div>
+                    `;
+                }
+
+                default:
+                    return `<div>${esc(component.type)} Component</div>`;
             }
         };
 
-        // Generate full email template
+        const tree = buildComponentTree(components);
+
+        // Render root-level components with side-by-side layout support
+        const renderRootComponents = (rootComponents: TemplateComponent[]): string => {
+            if (rootComponents.length === 0) return '';
+
+            // Group components by horizontal position for side-by-side layout
+            const rows = groupComponentsIntoRows(rootComponents);
+
+            return rows.map(row => {
+                // If only one component in the row, render it normally
+                if (row.length === 1) {
+                    return renderNode(row[0]);
+                }
+
+                // Multiple components side-by-side - create a horizontal table
+                const colWidth = `${Math.floor(100 / row.length)}%`;
+                const colsHtml = row.map((comp, idx) => {
+                    const rightPad = idx === row.length - 1 ? '0' : '8px';
+                    return `
+                      <td valign="top" width="${colWidth}" style="padding-right:${rightPad};box-sizing:border-box;">
+                        ${renderNode(comp)}
+                      </td>
+                    `;
+                }).join('');
+
+                return `
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                    <tr>
+                      ${colsHtml}
+                    </tr>
+                  </table>
+                `;
+            }).join('');
+        };
+
+        const contentHtml = renderRootComponents(tree);
+
         const fullHtml = `
       <!DOCTYPE html>
-      <html>
+      <html lang="en">
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="x-apple-disable-message-reformatting">
         <title>Email Template</title>
-        <style>
-          body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-          }
-          .email-wrapper {
-            max-width: 400px;
-            margin: 0 auto;
-            background-color: #f8fafc;
-            padding: 12px;
-          }
-          .email-container {
-            background-color: #ffffff;
-            border-radius: 6px;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-          }
-          @media only screen and (max-width: 400px) {
-            .email-wrapper {
-              padding: 8px;
-            }
-            .email-container {
-              border-radius: 4px;
-            }
-          }
-        </style>
       </head>
-      <body>
-        <div class="email-wrapper">
-          <div class="email-container">
-            ${components.map(generateComponentHtml).join('')}
-          </div>
-        </div>
+      <body style="margin:0;padding:0;background-color:#f3f4f6;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:#f3f4f6;">
+          <tr>
+            <td align="center" style="padding:16px 10px;">
+              <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;border-collapse:collapse;background-color:#ffffff;">
+                <tr>
+                  <td style="padding:0;">
+                    ${contentHtml}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       </body>
       </html>
     `;
 
         setOutputHtml(fullHtml);
         setShowPreview(true);
-    }, [components]);
+        flashActionMessage('HTML generated');
+    }, [components, flashActionMessage]);
 
     // Performance-optimized resize handle rendering
     const renderResizeHandles = useCallback((component: TemplateComponent) => {
-        const handles: any[] = [];
+        const handles: React.ReactElement[] = [];
         // Define handle positions for 8-point resize
         const positions = [
             { direction: 'nw', cursor: 'nw-resize', left: -4, top: -4 },
@@ -1137,37 +1662,87 @@ export default function EnhancedTemplateBuilder() {
         return handles;
     }, [handleResizeMouseDown]);
 
-    // Performance-optimized component rendering
+    // Droppable container component for nesting
+    const DroppableContainer = ({ id, children, isContainer }: { id: string; children: React.ReactNode; isContainer: boolean }) => {
+        const { setNodeRef, isOver } = useDroppable({
+            id,
+            disabled: !isContainer
+        });
+
+        return (
+            <div
+                ref={setNodeRef}
+                className={`relative w-full h-full ${isOver && isContainer ? 'bg-blue-50 border-2 border-blue-400 border-dashed' : ''}`}
+                style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '100%'
+                }}
+            >
+                {children}
+                {isOver && isContainer && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">
+                            Drop here
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    // Enhanced component rendering
     const renderComponent = useCallback((component: TemplateComponent) => {
-        const Component = EmailComponents[component.type] as React.ComponentType<any>;
+        const Component = (EmailComponents as any)[component.type] as React.ComponentType<any>;
         const isSelected = selectedComponent === component.id;
         const nestLevel = component.nestLevel || 0;
-        const isContainer = ['Section', 'Card'].includes(component.type);
+        const isContainer = ['Section', 'Card', 'Row'].includes(component.type);
 
         const safeProps = component.type === 'SocialLinks'
             ? {
                 ...component.props,
                 links: Array.isArray((component.props as any)?.links) ? (component.props as any).links : [],
             }
-            : component.props;
+            : component.type === 'Footer' || component.type === 'Header'
+                ? {
+                    ...component.props,
+                    textColor: component.style?.textColor ?? (component.props as any)?.textColor,
+                    backgroundColor: component.style?.backgroundColor ?? (component.props as any)?.backgroundColor,
+                }
+                : component.props;
 
         // Enhanced component styling with proper centering
+        const isTextComponent = component.type === 'Text';
+        const textAlign = (component.style?.textAlign || 'left') as string;
+        const textAlignItems = textAlign === 'center'
+            ? 'center'
+            : textAlign === 'right'
+                ? 'flex-end'
+                : 'flex-start';
+        const textVerticalJustify = (component.style?.justifyContent || 'center') as React.CSSProperties['justifyContent'];
+
         const componentStyle: React.CSSProperties = {
             position: 'absolute',
             left: component.position?.x || 0,
             top: component.position?.y || 0,
             width: component.size?.width || 150,
             height: component.size?.height || 100,
-            backgroundColor: component.style?.backgroundColor || NEST_COLORS[nestLevel % NEST_COLORS.length],
+            backgroundColor: component.style?.backgroundColor || (component.type === 'Card' ? '#fef3c7' : component.type === 'Section' ? '#f0f9ff' : component.type === 'SocialLinks' ? '#f0fdf4' : NEST_COLORS[nestLevel % NEST_COLORS.length]),
             color: component.style?.textColor || '#000000',
             fontSize: component.style?.fontSize || '12px',
             fontFamily: component.style?.fontFamily || 'Arial, sans-serif',
             fontWeight: component.style?.fontWeight || 'normal',
-            padding: component.style?.padding || '4px', // Reduced padding
-            margin: component.style?.margin || '2px', // Reduced margin
+            padding: component.style?.padding || '4px',
+            margin: component.style?.margin || '2px',
             border: isSelected
                 ? '2px solid #3b82f6'
-                : '1px solid transparent',
+                : component.type === 'Card'
+                    ? component.style?.border || '2px solid #f59e0b'
+                    : component.type === 'Section'
+                        ? component.style?.border || '2px solid #bae6fd'
+                        : component.type === 'SocialLinks'
+                            ? component.style?.border || '2px solid #86efac'
+                            : '1px solid transparent',
             borderRadius: component.style?.borderRadius || '3px',
             opacity: component.style?.opacity || 1,
             zIndex: component.style?.zIndex || nestLevel,
@@ -1179,15 +1754,27 @@ export default function EnhancedTemplateBuilder() {
             lineHeight: component.style?.lineHeight || '1.4',
             letterSpacing: component.style?.letterSpacing || 'normal',
             display: component.style?.display || 'flex',
-            alignItems: component.style?.alignItems || 'center',
-            justifyContent: component.style?.justifyContent || 'center',
+            alignItems: isTextComponent ? (textAlignItems as any) : (component.style?.alignItems || 'center'),
+            justifyContent: isTextComponent ? (textVerticalJustify as any) : (component.style?.justifyContent || 'center'),
+        };
+
+        const innerStyle: React.CSSProperties = {
+            ...componentStyle,
+            position: 'relative',
+            left: 'auto',
+            top: 'auto',
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            boxShadow: 'none',
+            cursor: 'inherit',
         };
 
         return (
             <div
                 key={component.id}
                 style={componentStyle}
-                className="group hover:outline-1 hover:outline-gray-300"
+                className={isSelected ? 'group' : 'group hover:outline-1 hover:outline-gray-300'}
                 onMouseDown={(e) => handleComponentMouseDown(e, component.id)}
                 onDoubleClick={() => {
                     if (component.type === 'Text' || component.type === 'Button') {
@@ -1256,23 +1843,18 @@ export default function EnhancedTemplateBuilder() {
 
                 {/* Enhanced component content with proper flexbox centering */}
                 {!inlineEditing && Component && (
-                    <div
-                        className="w-full h-full flex items-center justify-center"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                        }}
-                    >
-                        <Component {...safeProps} style={{
-                            ...componentStyle,
-                            position: 'relative',
-                            left: 'auto',
-                            top: 'auto',
-                            width: '100%',
-                            height: '100%',
-                        }} />
-                    </div>
+                    <DroppableContainer id={component.id} isContainer={isContainer}>
+                        <div
+                            className="w-full h-full flex"
+                            style={{
+                                display: 'flex',
+                                alignItems: isTextComponent ? (textAlignItems as any) : 'center',
+                                justifyContent: isTextComponent ? (textVerticalJustify as any) : 'center'
+                            }}
+                        >
+                            <Component {...safeProps} style={innerStyle} />
+                        </div>
+                    </DroppableContainer>
                 )}
 
                 {/* Resize handles for selected components */}
@@ -1299,6 +1881,11 @@ export default function EnhancedTemplateBuilder() {
             }}
         >
             <div className="min-h-screen bg-linear-to-br from-gray-900 to-gray-950 text-gray-100">
+                {actionMessage && (
+                    <div className="fixed top-4 right-4 z-1000 bg-gray-900/90 border border-gray-700 text-gray-100 px-3 py-2 rounded-lg shadow-lg text-sm">
+                        {actionMessage}
+                    </div>
+                )}
                 <Navigation />
 
                 <div className="p-4">
@@ -1306,7 +1893,7 @@ export default function EnhancedTemplateBuilder() {
                     <div className="mb-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
+                                <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-linear-to-r from-blue-400 to-emerald-400">
                                     Email Template Builder
                                 </h1>
                                 <p className="text-gray-400 text-sm">
@@ -1353,6 +1940,27 @@ export default function EnhancedTemplateBuilder() {
                                     className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded text-sm font-medium transition-all"
                                 >
                                     Load
+                                </button>
+
+                                <button
+                                    onClick={deleteTemplate}
+                                    className="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded text-sm font-medium transition-all"
+                                >
+                                    Delete
+                                </button>
+
+                                <button
+                                    onClick={createSampleTemplate}
+                                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded text-sm font-medium transition-all"
+                                >
+                                    Sample
+                                </button>
+
+                                <button
+                                    onClick={startNewTemplate}
+                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm font-medium transition-all"
+                                >
+                                    New
                                 </button>
                             </div>
                         </div>
@@ -1530,7 +2138,7 @@ export default function EnhancedTemplateBuilder() {
                                 </div>
 
                                 <div
-                                    className="p-3 bg-gradient-to-br from-gray-900 to-gray-800"
+                                    className="p-3 bg-linear-to-br from-gray-900 to-gray-800"
                                     onMouseMove={handleCanvasMouseMove}
                                     onMouseUp={handleCanvasMouseUp}
                                     onMouseLeave={handleCanvasMouseUp}
@@ -1606,7 +2214,7 @@ export default function EnhancedTemplateBuilder() {
                             linear-gradient(#e5e7eb 1px, transparent 1px)
                           `,
                                                     backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-                                                    opacity: 0.2,
+                                                    opacity: 0.55,
                                                 }}
                                             />
                                         )}
@@ -1819,7 +2427,7 @@ export default function EnhancedTemplateBuilder() {
                                                     </div>
 
                                                     {/* Content / component-specific props */}
-                                                    {['Text', 'Button', 'Card', 'Section', 'Header', 'Footer'].includes(component.type) && (
+                                                    {['Text', 'Button', 'Card', 'Section', 'Header'].includes(component.type) && (
                                                         <div>
                                                             <label className="text-xs text-gray-400">Content</label>
                                                             <input
@@ -1831,6 +2439,81 @@ export default function EnhancedTemplateBuilder() {
                                                                 className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
                                                                 placeholder="Enter text..."
                                                             />
+                                                        </div>
+                                                    )}
+
+                                                    {component.type === 'Footer' && (
+                                                        <div className="space-y-2">
+                                                            <div>
+                                                                <label className="text-xs text-gray-400">Company</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={(component.props.company as any) ?? ''}
+                                                                    onChange={(e) => updateComponent(component.id, {
+                                                                        props: { ...component.props, company: e.target.value }
+                                                                    })}
+                                                                    className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
+                                                                    placeholder="Your Company"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-xs text-gray-400">Address</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={(component.props.address as any) ?? ''}
+                                                                    onChange={(e) => updateComponent(component.id, {
+                                                                        props: { ...component.props, address: e.target.value }
+                                                                    })}
+                                                                    className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
+                                                                    placeholder="123 Main St"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-xs text-gray-400">Unsubscribe Link</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={(component.props.unsubscribeLink as any) ?? ''}
+                                                                    onChange={(e) => updateComponent(component.id, {
+                                                                        props: { ...component.props, unsubscribeLink: e.target.value }
+                                                                    })}
+                                                                    className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
+                                                                    placeholder="https://..."
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {component.type === 'Text' && (
+                                                        <div className="space-y-2">
+                                                            <div>
+                                                                <label className="text-xs text-gray-400">Horizontal Align</label>
+                                                                <select
+                                                                    value={component.style?.textAlign || 'left'}
+                                                                    onChange={(e) => updateComponent(component.id, {
+                                                                        style: { ...component.style, textAlign: e.target.value as any }
+                                                                    })}
+                                                                    className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
+                                                                >
+                                                                    {['left', 'center', 'right', 'justify'].map(a => (
+                                                                        <option key={a} value={a}>{a}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="text-xs text-gray-400">Vertical Align</label>
+                                                                <select
+                                                                    value={component.style?.justifyContent || 'center'}
+                                                                    onChange={(e) => updateComponent(component.id, {
+                                                                        style: { ...component.style, justifyContent: e.target.value }
+                                                                    })}
+                                                                    className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
+                                                                >
+                                                                    <option value="flex-start">top</option>
+                                                                    <option value="center">middle</option>
+                                                                    <option value="flex-end">bottom</option>
+                                                                </select>
+                                                            </div>
                                                         </div>
                                                     )}
 
@@ -1928,7 +2611,10 @@ export default function EnhancedTemplateBuilder() {
                                 <div className="flex items-center justify-between mb-2">
                                     <h3 className="text-base font-semibold">HTML Output</h3>
                                     <button
-                                        onClick={() => navigator.clipboard.writeText(outputHtml)}
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(outputHtml);
+                                            flashActionMessage('Copied');
+                                        }}
                                         className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm"
                                     >
                                         Copy HTML
