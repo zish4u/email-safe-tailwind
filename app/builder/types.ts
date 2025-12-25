@@ -160,13 +160,16 @@ export const DEFAULT_COMPONENT_SIZES: Record<ComponentType, { width: number; hei
 };
 
 // Canvas sizes for different preview modes
-export type PreviewMode = 'desktop' | 'tablet' | 'mobile';
+export type PreviewMode = 'desktop' | 'mobile';
 
 export const CANVAS_SIZES: Record<PreviewMode, { width: number; height: number }> = {
-    desktop: { width: 700, height: 800 },
-    tablet: { width: 550, height: 700 },
-    mobile: { width: 400, height: 600 },
+    desktop: { width: 600, height: 800 }, // Standard email width for desktop
+    mobile: { width: 375, height: 667 }, // Standard mobile dimensions
 };
+
+// Zoom levels for canvas (independent of device dimensions)
+export const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+export const DEFAULT_ZOOM = 1;
 
 // LocalStorage key for template persistence
 export const TEMPLATE_STORAGE_KEY = 'email-safe-tailwind:builder-template:v1';

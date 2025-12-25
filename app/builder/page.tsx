@@ -16,7 +16,7 @@ import { Navigation } from '@/components/Navigation';
 import { ComponentEditor } from '@/components/builder/ComponentEditor';
 
 // Local modules
-import { TemplateComponent, PreviewMode, CANVAS_SIZES } from './types';
+import { TemplateComponent, PreviewMode, CANVAS_SIZES, ZOOM_LEVELS, DEFAULT_ZOOM } from './types';
 import { useTemplateBuilder, useCanvasInteractions } from './hooks';
 import { ComponentLibrary, BuilderCanvas, PropertiesPanel, PreviewPanel } from './components';
 
@@ -51,7 +51,7 @@ export default function EnhancedTemplateBuilder() {
 
     // UI state
     const [previewMode, setPreviewMode] = useState<PreviewMode>('desktop');
-    const [canvasScale, setCanvasScale] = useState(1);
+    const [canvasZoom, setCanvasZoom] = useState(DEFAULT_ZOOM);
     const [showGrid, setShowGrid] = useState(true);
     const [snapToGrid, setSnapToGrid] = useState(true);
     const [showPreview, setShowPreview] = useState(false);
@@ -77,7 +77,7 @@ export default function EnhancedTemplateBuilder() {
         updateComponentPosition,
         previewMode,
         snapToGrid,
-        canvasScale,
+        canvasZoom,
     });
 
     // DnD sensors
@@ -163,7 +163,12 @@ export default function EnhancedTemplateBuilder() {
     // Handle preview mode change
     const handlePreviewModeChange = useCallback((mode: PreviewMode) => {
         setPreviewMode(mode);
-        setCanvasScale(mode === 'desktop' ? 1 : mode === 'tablet' ? 0.85 : 0.7);
+        // Zoom is now independent of preview mode
+    }, []);
+
+    // Handle zoom level change
+    const handleZoomChange = useCallback((zoom: number) => {
+        setCanvasZoom(zoom);
     }, []);
 
     // Get selected component for properties panel
@@ -264,13 +269,13 @@ export default function EnhancedTemplateBuilder() {
                             <div className="flex items-center gap-2">
                                 <span className="text-xs text-gray-400">Device:</span>
                                 <div className="flex bg-gray-700 rounded-lg p-0.5">
-                                    {(['desktop', 'tablet', 'mobile'] as const).map((mode) => (
+                                    {(['desktop', 'mobile'] as const).map((mode: any) => (
                                         <button
                                             key={mode}
                                             onClick={() => handlePreviewModeChange(mode)}
                                             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${previewMode === mode
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'text-gray-300 hover:text-white'
+                                                ? 'bg-blue-600 text-white'
+                                                : 'text-gray-300 hover:text-white'
                                                 }`}
                                         >
                                             {mode === 'desktop' ? '🖥️ Desktop' : mode === 'tablet' ? '📱 Tablet' : '📲 Mobile'}
@@ -299,10 +304,44 @@ export default function EnhancedTemplateBuilder() {
                                 <span className="text-gray-300">Snap</span>
                             </label>
 
+                            {/* Zoom Controls */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400">Zoom:</span>
+                                <div className="flex items-center bg-gray-700 rounded-lg p-0.5">
+                                    <button
+                                        onClick={() => handleZoomChange(Math.max(0.5, canvasZoom - 0.25))}
+                                        disabled={canvasZoom <= 0.5}
+                                        className="px-2 py-1 rounded text-xs hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                        title="Zoom Out"
+                                    >
+                                        −
+                                    </button>
+                                    <select
+                                        value={canvasZoom}
+                                        onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
+                                        className="bg-transparent text-xs text-gray-300 px-1 py-0.5 focus:outline-none"
+                                    >
+                                        {ZOOM_LEVELS.map((level) => (
+                                            <option key={level} value={level} className="bg-gray-700">
+                                                {Math.round(level * 100)}%
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={() => handleZoomChange(Math.min(2, canvasZoom + 0.25))}
+                                        disabled={canvasZoom >= 2}
+                                        className="px-2 py-1 rounded text-xs hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                        title="Zoom In"
+                                    >
+                                        +
+                                    </button>
+                                </div>
+                            </div>
+
                             {/* Canvas size indicator */}
                             <div className="text-xs text-gray-500 ml-auto">
                                 {CANVAS_SIZES[previewMode].width} × {CANVAS_SIZES[previewMode].height}px
-                                {canvasScale !== 1 && ` (${Math.round(canvasScale * 100)}%)`}
+                                {canvasZoom !== 1 && ` (${Math.round(canvasZoom * 100)}%)`}
                             </div>
                         </div>
                     </div>
@@ -320,7 +359,7 @@ export default function EnhancedTemplateBuilder() {
                                 components={components}
                                 selectedComponent={selectedComponent}
                                 previewMode={previewMode}
-                                canvasScale={canvasScale}
+                                canvasZoom={canvasZoom}
                                 showGrid={showGrid}
                                 snapToGrid={snapToGrid}
                                 isDragging={isDragging}
@@ -352,8 +391,8 @@ export default function EnhancedTemplateBuilder() {
                                                 key={c.id}
                                                 onClick={() => setSelectedComponent(c.id)}
                                                 className={`px-2 py-1 rounded text-xs ${selectedComponent === c.id
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                                     }`}
                                             >
                                                 {c.type}

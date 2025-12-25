@@ -23,7 +23,7 @@ export interface UseCanvasInteractionsProps {
     updateComponentPosition: (id: string, x: number, y: number, width?: number, height?: number) => void;
     previewMode: PreviewMode;
     snapToGrid: boolean;
-    canvasScale: number;
+    canvasZoom: number;
 }
 
 export interface UseCanvasInteractionsReturn {
@@ -51,7 +51,7 @@ export function useCanvasInteractions({
     updateComponentPosition,
     previewMode,
     snapToGrid,
-    canvasScale,
+    canvasZoom,
 }: UseCanvasInteractionsProps): UseCanvasInteractionsReturn {
     const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -91,14 +91,14 @@ export function useCanvasInteractions({
 
         const rect = canvasRef.current?.getBoundingClientRect();
         if (rect) {
-            const mouseX = (e.clientX - rect.left) / canvasScale;
-            const mouseY = (e.clientY - rect.top) / canvasScale;
+            const mouseX = (e.clientX - rect.left) / canvasZoom;
+            const mouseY = (e.clientY - rect.top) / canvasZoom;
             setDragOffset({
                 x: mouseX - (component.position?.x || 0),
                 y: mouseY - (component.position?.y || 0),
             });
         }
-    }, [components, setSelectedComponent, canvasScale]);
+    }, [components, setSelectedComponent, canvasZoom]);
 
     // Handle resize mouse down
     const handleResizeMouseDown = useCallback((e: React.MouseEvent, componentId: string, direction: string) => {
@@ -131,8 +131,8 @@ export function useCanvasInteractions({
         if (!rect) return;
 
         if (isDragging) {
-            const mouseX = (e.clientX - rect.left) / canvasScale;
-            const mouseY = (e.clientY - rect.top) / canvasScale;
+            const mouseX = (e.clientX - rect.left) / canvasZoom;
+            const mouseY = (e.clientY - rect.top) / canvasZoom;
 
             let newX = mouseX - dragOffset.x;
             let newY = mouseY - dragOffset.y;
@@ -154,8 +154,8 @@ export function useCanvasInteractions({
         }
 
         if (isResizing) {
-            const deltaX = (e.clientX - resizeStart.x) / canvasScale;
-            const deltaY = (e.clientY - resizeStart.y) / canvasScale;
+            const deltaX = (e.clientX - resizeStart.x) / canvasZoom;
+            const deltaY = (e.clientY - resizeStart.y) / canvasZoom;
 
             let newWidth = resizeStart.width;
             let newHeight = resizeStart.height;
@@ -206,7 +206,7 @@ export function useCanvasInteractions({
         resizeStart,
         resizeDirection,
         snapToGrid,
-        canvasScale,
+        canvasZoom,
         getCanvasBoundaries,
         updateComponentPosition,
     ]);

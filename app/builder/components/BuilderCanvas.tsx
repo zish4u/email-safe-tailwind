@@ -15,7 +15,7 @@ interface BuilderCanvasProps {
     components: TemplateComponent[];
     selectedComponent: string | null;
     previewMode: PreviewMode;
-    canvasScale: number;
+    canvasZoom: number;
     showGrid: boolean;
     snapToGrid: boolean;
     isDragging: boolean;
@@ -43,7 +43,7 @@ export const BuilderCanvas = memo(function BuilderCanvas({
     components,
     selectedComponent,
     previewMode,
-    canvasScale,
+    canvasZoom,
     showGrid,
     snapToGrid,
     isDragging,
@@ -73,15 +73,15 @@ export const BuilderCanvas = memo(function BuilderCanvas({
         const canvasRect = canvasRef.current?.getBoundingClientRect();
         if (!canvasRect) return;
 
-        const dropX = (e.clientX - canvasRect.left) / canvasScale;
-        const dropY = (e.clientY - canvasRect.top) / canvasScale;
+        const dropX = (e.clientX - canvasRect.left) / canvasZoom;
+        const dropY = (e.clientY - canvasRect.top) / canvasZoom;
 
         const actualType = componentType.replace('library-', '');
         const compSize = getDefaultComponentSize(actualType);
 
         // Apply safe area constraints with grid snapping
-        let finalX = Math.max(SAFE_AREA_PADDING, Math.min(dropX, canvasRect.width / canvasScale - compSize.width - SAFE_AREA_PADDING));
-        let finalY = Math.max(SAFE_AREA_PADDING, Math.min(dropY, canvasRect.height / canvasScale - compSize.height - SAFE_AREA_PADDING));
+        let finalX = Math.max(SAFE_AREA_PADDING, Math.min(dropX, canvasRect.width / canvasZoom - compSize.width - SAFE_AREA_PADDING));
+        let finalY = Math.max(SAFE_AREA_PADDING, Math.min(dropY, canvasRect.height / canvasZoom - compSize.height - SAFE_AREA_PADDING));
 
         if (snapToGrid) {
             finalX = Math.round(finalX / GRID_SIZE) * GRID_SIZE;
@@ -89,7 +89,7 @@ export const BuilderCanvas = memo(function BuilderCanvas({
         }
 
         onAddComponent(actualType, undefined, { x: finalX, y: finalY });
-    }, [canvasRef, canvasScale, snapToGrid, onAddComponent]);
+    }, [canvasRef, canvasZoom, snapToGrid, onAddComponent]);
 
     return (
         <div className="bg-gray-900 rounded-xl border border-gray-700/50 overflow-hidden">
@@ -120,7 +120,7 @@ export const BuilderCanvas = memo(function BuilderCanvas({
 
             {/* Canvas Area */}
             <div
-                className="p-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-auto"
+                className="p-6 bg-linear-to-br from-gray-900 via-gray-800 to-gray-900 overflow-auto"
                 onMouseMove={onCanvasMouseMove}
                 onMouseUp={onCanvasMouseUp}
                 onMouseLeave={onCanvasMouseUp}
@@ -137,7 +137,7 @@ export const BuilderCanvas = memo(function BuilderCanvas({
                     style={{
                         width: `${canvasSize.width}px`,
                         height: `${canvasSize.height}px`,
-                        transform: `scale(${canvasScale})`,
+                        transform: `scale(${canvasZoom})`,
                         transformOrigin: 'top center',
                         transition: 'width 0.3s, height 0.3s',
                     }}
