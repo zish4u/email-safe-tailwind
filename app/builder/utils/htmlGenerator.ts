@@ -381,6 +381,118 @@ function renderNode(component: TemplateComponent): string {
                 : imgHtml;
         }
 
+        case 'Module': {
+            const backgroundColor = component.props?.backgroundColor || '#ffffff';
+            const padding = component.props?.padding || {};
+            const margin = component.props?.margin || {};
+            const maxWidth = component.props?.maxWidth || 600;
+            const fullWidth = component.props?.fullWidth !== false;
+
+            const paddingValue = `${padding.all || 16}px ${padding.horizontal || 16}px ${padding.all || 16}px ${padding.horizontal || 16}px`;
+            const marginValue = `${margin.all || 0}px auto`;
+            const widthValue = fullWidth ? '100%' : `${maxWidth}px`;
+
+            return `
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                    <tr>
+                        <td align="center" style="padding:${marginValue};">
+                            <table role="presentation" width="${widthValue}" cellpadding="0" cellspacing="0" border="0" style="width:${widthValue};border-collapse:collapse;">
+                                <tr>
+                                    <td style="background-color:${backgroundColor};padding:${paddingValue};border-radius:4px;">
+                                        ${childrenHtml}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            `;
+        }
+
+        case 'Grid': {
+            const columns = component.props?.columns || 2;
+            const columnSpacing = component.props?.columnSpacing || 16;
+            const backgroundColor = component.props?.backgroundColor || 'transparent';
+            const padding = component.props?.padding || {};
+
+            const paddingValue = `${padding.all || 0}px ${padding.horizontal || 0}px ${padding.all || 0}px ${padding.horizontal || 0}px`;
+            const colWidth = `${Math.floor(100 / columns)}%`;
+            const spacingStyle = `padding-left:${columnSpacing}px;`;
+
+            return `
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                    <tr>
+                        <td style="background-color:${backgroundColor};padding:${paddingValue};">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                                <tr>
+                                    ${Array.from({ length: columns }, (_, i) => `
+                                        <td valign="top" width="${colWidth}" style="${i > 0 ? spacingStyle : ''}width:${colWidth};">
+                                            ${childrenHtml}
+                                        </td>
+                                    `).join('')}
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            `;
+        }
+
+        case 'GridItem': {
+            const backgroundColor = component.props?.backgroundColor || 'transparent';
+            const padding = component.props?.padding || {};
+            const paddingValue = `${padding.all || 8}px ${padding.horizontal || 8}px ${padding.all || 8}px ${padding.horizontal || 8}px`;
+
+            return `
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                    <tr>
+                        <td style="background-color:${backgroundColor};padding:${paddingValue};vertical-align:top;">
+                            ${childrenHtml}
+                        </td>
+                    </tr>
+                </table>
+            `;
+        }
+
+        case 'Group': {
+            const direction = component.props?.direction || 'vertical';
+            const spacing = component.props?.spacing || 10;
+            const backgroundColor = component.props?.backgroundColor || 'transparent';
+            const padding = component.props?.padding || {};
+            const paddingValue = `${padding.all || 0}px ${padding.horizontal || 0}px ${padding.all || 0}px ${padding.horizontal || 0}px`;
+
+            if (direction === 'horizontal') {
+                return `
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                        <tr>
+                            <td style="background-color:${backgroundColor};padding:${paddingValue};">
+                                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                                    <tr>
+                                        ${childrenHtml.split(/(?=<table)/).map((child, i) => i > 0 ?
+                    `<td style="padding-left:${spacing}px;vertical-align:top;">${child}</td>` :
+                    `<td style="vertical-align:top;">${child}</td>`
+                ).join('')}
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                `;
+            } else {
+                return `
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                        <tr>
+                            <td style="background-color:${backgroundColor};padding:${paddingValue};">
+                                ${childrenHtml.split(/(?=<table)/).map((child, i) => i > 0 ?
+                    `<div style="margin-top:${spacing}px;">${child}</div>` : child
+                ).join('')}
+                            </td>
+                        </tr>
+                    </table>
+                `;
+            }
+        }
+
         default:
             return `<div style="padding:8px;border:1px dashed #ccc;">Unsupported: ${esc(component.type)}</div>`;
     }

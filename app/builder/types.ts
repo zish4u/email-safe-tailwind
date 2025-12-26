@@ -64,22 +64,14 @@ export interface ComponentStyle {
 // Component types supported by the builder
 export type ComponentType =
     | 'Section'
-    | 'Column'
     | 'Row'
-    | 'Grid'
+    | 'Column'
+    | 'Group'
     | 'Text'
     | 'Image'
-    | 'Card'
-    | 'Divider'
     | 'Button'
-    | 'SocialLinks'
-    | 'Menu'
-    | 'Logo'
-    | 'Header'
-    | 'Footer'
-    | 'Spacer'
-    | 'Wrapper'
-    | 'Conditional';
+    | 'Divider'
+    | 'Spacer';
 
 // Component metadata for UI display
 export interface ComponentDetail {
@@ -88,36 +80,35 @@ export interface ComponentDetail {
 }
 
 export const COMPONENT_DETAILS: Record<ComponentType, ComponentDetail> = {
-    Section: { icon: '📦', description: 'Container for content' },
-    Column: { icon: '📐', description: 'Vertical layout column' },
-    Row: { icon: '↔️', description: 'Horizontal layout row' },
-    Grid: { icon: '🔲', description: 'Flexible grid layout' },
+    // Section: { icon: '📦', description: 'Container for content' },
+    // Column: { icon: '📐', description: 'Vertical layout column' },
+    Section: { icon: '📦', description: 'Horizontal layout row' },
+    Row: { icon: '↔️', description: 'Flexible grid layout' },
+    Column: { icon: '📐', description: 'Flexible grid layout' },
+    Group: { icon: '🔲', description: 'Flexible grid layout' },
     Text: { icon: '📝', description: 'Text content block' },
     Image: { icon: '🖼️', description: 'Image with alt text' },
-    Card: { icon: '🃏', description: 'Card with content' },
+    // Card: { icon: '🃏', description: 'Card with content' },
     Divider: { icon: '➖', description: 'Horizontal divider line' },
     Button: { icon: '🔘', description: 'Clickable button' },
-    SocialLinks: { icon: '🔗', description: 'Social media links' },
-    Menu: { icon: '🍔', description: 'Navigation menu' },
-    Logo: { icon: '🏢', description: 'Company logo' },
-    Header: { icon: '📄', description: 'Email header section' },
-    Footer: { icon: '📌', description: 'Email footer with unsubscribe' },
+    // SocialLinks: { icon: '🔗', description: 'Social media links' },
+    // Menu: { icon: '🍔', description: 'Navigation menu' },
+    // Logo: { icon: '🏢', description: 'Company logo' },
+    // Header: { icon: '📄', description: 'Email header section' },
+    // Footer: { icon: '📌', description: 'Email footer with unsubscribe' },
     Spacer: { icon: '↕️', description: 'Vertical space' },
-    Wrapper: { icon: '📎', description: 'Content wrapper' },
-    Conditional: { icon: '🎯', description: 'Conditional content' },
+    // Wrapper: { icon: '📎', description: 'Content wrapper' },
+    // Conditional: { icon: '🎯', description: 'Conditional content' },
 };
 
 // Component categories for the library sidebar
 export const COMPONENT_CATEGORIES: Record<string, ComponentType[]> = {
-    Layout: ['Section', 'Column', 'Row', 'Grid'],
-    Content: ['Text', 'Image', 'Card', 'Divider'],
-    Interactive: ['Button', 'SocialLinks', 'Menu'],
-    Branding: ['Logo', 'Header', 'Footer'],
-    Advanced: ['Spacer', 'Wrapper', 'Conditional'],
+    Layout: ['Section', 'Row', 'Column', 'Group'],
+    Content: ['Button', 'Text', 'Image', 'Divider', 'Spacer'],
 };
 
 // Container components that can accept children
-export const CONTAINER_TYPES: ComponentType[] = ['Section', 'Card', 'Row', 'Column', 'Wrapper'];
+export const CONTAINER_TYPES: ComponentType[] = ['Section', 'Row', 'Column', 'Group'];
 
 // Nest level colors with good contrast for visual hierarchy
 export const NEST_COLORS = [
@@ -133,30 +124,22 @@ export const NEST_COLORS = [
     'rgba(15, 23, 42, 0.9)',    // slate-900
 ];
 
-// Grid and layout constants
+// Row and layout constants
 export const GRID_SIZE = 8;
 export const SAFE_AREA_PADDING = 16;
 export const MAX_NEST_LEVEL = 5;
 
 // Default component sizes (compact for email)
 export const DEFAULT_COMPONENT_SIZES: Record<ComponentType, { width: number; height: number }> = {
+    Section: { width: 150, height: 200 },
+    Row: { width: 400, height: 150 },
+    Column: { width: 400, height: 80 },
+    Group: { width: 80, height: 30 },
     Button: { width: 120, height: 40 },
     Text: { width: 200, height: 40 },
-    Section: { width: 400, height: 150 },
     Image: { width: 200, height: 150 },
-    Header: { width: 400, height: 80 },
-    Footer: { width: 400, height: 60 },
-    Card: { width: 200, height: 120 },
     Divider: { width: 400, height: 2 },
-    Column: { width: 150, height: 200 },
-    Row: { width: 400, height: 80 },
-    Grid: { width: 400, height: 150 },
-    Logo: { width: 80, height: 30 },
     Spacer: { width: 400, height: 10 },
-    Wrapper: { width: 400, height: 100 },
-    Conditional: { width: 400, height: 80 },
-    SocialLinks: { width: 200, height: 30 },
-    Menu: { width: 400, height: 40 },
 };
 
 // Canvas sizes for different preview modes

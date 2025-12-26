@@ -25,6 +25,7 @@ interface BuilderCanvasProps {
     inlineEditing: string | null;
     onSelectComponent: (id: string | null) => void;
     onDeleteComponent: (id: string) => void;
+    onDuplicateComponent: (id: string) => void;
     onUpdateComponent: (id: string, updates: Partial<TemplateComponent>) => void;
     onAddComponent: (type: string, parentId?: string, position?: { x: number; y: number }) => void;
     onComponentMouseDown: (e: React.MouseEvent, componentId: string) => void;
@@ -53,6 +54,7 @@ export const BuilderCanvas = memo(function BuilderCanvas({
     inlineEditing,
     onSelectComponent,
     onDeleteComponent,
+    onDuplicateComponent,
     onUpdateComponent,
     onAddComponent,
     onComponentMouseDown,
@@ -202,6 +204,7 @@ export const BuilderCanvas = memo(function BuilderCanvas({
                             inlineEditing={inlineEditing === component.id}
                             onSelect={() => onSelectComponent(component.id)}
                             onDelete={() => onDeleteComponent(component.id)}
+                            onDuplicate={() => onDuplicateComponent(component.id)}
                             onUpdate={(updates) => onUpdateComponent(component.id, updates)}
                             onMouseDown={(e) => onComponentMouseDown(e, component.id)}
                             onResizeMouseDown={(e, dir) => onResizeMouseDown(e, component.id, dir)}
@@ -248,6 +251,7 @@ interface CanvasComponentProps {
     inlineEditing: boolean;
     onSelect: () => void;
     onDelete: () => void;
+    onDuplicate: () => void;
     onUpdate: (updates: Partial<TemplateComponent>) => void;
     onMouseDown: (e: React.MouseEvent) => void;
     onResizeMouseDown: (e: React.MouseEvent, direction: string) => void;
@@ -264,6 +268,7 @@ const CanvasComponent = memo(function CanvasComponent({
     inlineEditing,
     onSelect,
     onDelete,
+    onDuplicate,
     onUpdate,
     onMouseDown,
     onResizeMouseDown,
@@ -338,61 +343,6 @@ const CanvasComponent = memo(function CanvasComponent({
                     </div>
                 );
 
-            case 'Header':
-                return (
-                    <div
-                        style={{
-                            ...contentStyle,
-                            backgroundColor: style.backgroundColor || '#1e293b',
-                            color: style.textColor || '#ffffff',
-                            flexDirection: 'column',
-                            gap: '4px',
-                        }}
-                    >
-                        {typeof props.logo === 'string' && props.logo ? (
-                            <img
-                                src={props.logo}
-                                alt="Logo"
-                                style={{ maxHeight: '30px', marginBottom: '4px' }}
-                            />
-                        ) : null}
-                        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
-                            {String(props.title || 'Email Header')}
-                        </div>
-                        {typeof props.subtitle === 'string' && props.subtitle ? (
-                            <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                                {props.subtitle}
-                            </div>
-                        ) : null}
-                    </div>
-                );
-
-            case 'Footer':
-                return (
-                    <div
-                        style={{
-                            ...contentStyle,
-                            backgroundColor: style.backgroundColor || '#1e293b',
-                            color: style.textColor || '#94a3b8',
-                            flexDirection: 'column',
-                            gap: '4px',
-                            fontSize: '11px',
-                        }}
-                    >
-                        <div style={{ fontWeight: '600', fontSize: '12px' }}>
-                            {String(props.company || 'Your Company')}
-                        </div>
-                        <div style={{ opacity: 0.8 }}>
-                            {String(props.address || '123 Main St')}
-                        </div>
-                        {props.unsubscribeLink ? (
-                            <div style={{ fontSize: '10px', textDecoration: 'underline' }}>
-                                Unsubscribe
-                            </div>
-                        ) : null}
-                    </div>
-                );
-
             case 'Image':
                 return (
                     <div style={{ ...contentStyle, padding: 0 }}>
@@ -430,51 +380,57 @@ const CanvasComponent = memo(function CanvasComponent({
                     </div>
                 );
 
-            case 'SocialLinks':
-                return (
-                    <div
-                        style={{
-                            ...contentStyle,
-                            backgroundColor: style.backgroundColor || '#f0fdf4',
-                            gap: '8px',
-                        }}
-                    >
-                        {Array.isArray(props.links) ? (
-                            (props.links as Array<{ platform: string }>).map((link, idx) => (
-                                <div
-                                    key={idx}
-                                    style={{
-                                        width: '24px',
-                                        height: '24px',
-                                        borderRadius: '50%',
-                                        backgroundColor: '#374151',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#fff',
-                                        fontSize: '10px',
-                                    }}
-                                >
-                                    {link.platform?.charAt(0)?.toUpperCase() || '?'}
-                                </div>
-                            ))
-                        ) : (
-                            <span style={{ fontSize: '12px', color: '#666' }}>Social Links</span>
-                        )}
-                    </div>
-                );
-
             case 'Section':
-            case 'Card':
                 return (
                     <div
                         style={{
                             ...contentStyle,
-                            backgroundColor: style.backgroundColor || (component.type === 'Card' ? '#ffffff' : '#f0f9ff'),
-                            border: style.border || (component.type === 'Card' ? '1px solid #e5e7eb' : '2px solid #bae6fd'),
+                            backgroundColor: style.backgroundColor || '#f0f9ff',
+                            border: style.border || '2px solid #bae6fd',
                         }}
                     >
                         {String(props.children || component.type)}
+                    </div>
+                );
+
+            case 'Row':
+                return (
+                    <div
+                        style={{
+                            ...contentStyle,
+                            backgroundColor: style.backgroundColor || 'transparent',
+                            border: '1px dashed #3b82f6',
+                            gap: style.gap || '16px',
+                        }}
+                    >
+                        {String(props.children || 'Row')}
+                    </div>
+                );
+
+            case 'Column':
+                return (
+                    <div
+                        style={{
+                            ...contentStyle,
+                            backgroundColor: style.backgroundColor || 'transparent',
+                            border: '1px dashed #10b981',
+                            flexDirection: 'column',
+                        }}
+                    >
+                        {String(props.children || 'Column')}
+                    </div>
+                );
+
+            case 'Group':
+                return (
+                    <div
+                        style={{
+                            ...contentStyle,
+                            backgroundColor: style.backgroundColor || 'transparent',
+                            border: '1px dashed #f59e0b',
+                        }}
+                    >
+                        {String(props.children || 'Group')}
                     </div>
                 );
 
@@ -494,17 +450,6 @@ const CanvasComponent = memo(function CanvasComponent({
                         }}
                     >
                         Spacer
-                    </div>
-                );
-
-            case 'Logo':
-                return (
-                    <div style={{ ...contentStyle, padding: 0 }}>
-                        <img
-                            src={(props.src as string) || 'https://via.placeholder.com/80x30'}
-                            alt={(props.alt as string) || 'Logo'}
-                            style={{ maxWidth: '100%', maxHeight: '100%' }}
-                        />
                     </div>
                 );
 

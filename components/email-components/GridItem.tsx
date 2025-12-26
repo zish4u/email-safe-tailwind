@@ -1,33 +1,26 @@
 import React from 'react';
-import { DividerProps } from './types';
+import { GridItemProps, SpacingProps, BorderProps } from './types';
 
-export const Divider: React.FC<DividerProps> = ({
-    height = 1,
-    color = '#e0e0e0',
-    dividerStyle = 'solid',
-    width = '100%',
-    align = 'center',
-    text,
-    textColor,
-    textBackgroundColor,
-    textPadding = 8,
-    backgroundColor,
+export const GridItem: React.FC<GridItemProps> = ({
+    children,
+    width,
+    minWidth,
+    maxWidth,
+    flex,
+    backgroundColor = 'transparent',
     backgroundImage,
     padding,
     margin,
     border,
     borderRadius,
     boxShadow,
-    minWidth,
-    maxWidth,
-    minHeight,
-    maxHeight,
     verticalAlign = 'top',
+    textAlign = 'left',
     className = '',
     style = {},
     id,
 }) => {
-    const getSpacingStyles = (spacing?: any): React.CSSProperties => {
+    const getSpacingStyles = (spacing?: SpacingProps): React.CSSProperties => {
         if (!spacing) return {};
 
         const styles: React.CSSProperties = {};
@@ -52,7 +45,7 @@ export const Divider: React.FC<DividerProps> = ({
         return styles;
     };
 
-    const getMarginStyles = (margin?: any): React.CSSProperties => {
+    const getMarginStyles = (margin?: SpacingProps): React.CSSProperties => {
         if (!margin) return {};
 
         const styles: React.CSSProperties = {};
@@ -77,7 +70,7 @@ export const Divider: React.FC<DividerProps> = ({
         return styles;
     };
 
-    const getBorderStyles = (border?: any): React.CSSProperties => {
+    const getBorderStyles = (border?: BorderProps): React.CSSProperties => {
         if (!border) return {};
 
         const styles: React.CSSProperties = {};
@@ -92,11 +85,37 @@ export const Divider: React.FC<DividerProps> = ({
             styles.borderStyle = border.style;
         }
 
+        // Handle specific side borders
+        if (border.side && border.side !== 'all') {
+            // Reset all borders first
+            styles.borderWidth = '0';
+            styles.borderStyle = 'solid';
+
+            const borderWidth = border.width ? `${border.width}px` : '1px';
+            const borderStyle = border.style || 'solid';
+            const borderColor = border.color || '#000000';
+
+            switch (border.side) {
+                case 'top':
+                    styles.borderTop = `${borderWidth} ${borderStyle} ${borderColor}`;
+                    break;
+                case 'right':
+                    styles.borderRight = `${borderWidth} ${borderStyle} ${borderColor}`;
+                    break;
+                case 'bottom':
+                    styles.borderBottom = `${borderWidth} ${borderStyle} ${borderColor}`;
+                    break;
+                case 'left':
+                    styles.borderLeft = `${borderWidth} ${borderStyle} ${borderColor}`;
+                    break;
+            }
+        }
+
         return styles;
     };
 
     const getAlignClass = () => {
-        switch (align) {
+        switch (textAlign) {
             case 'left':
                 return 'text-left';
             case 'center':
@@ -104,26 +123,34 @@ export const Divider: React.FC<DividerProps> = ({
             case 'right':
                 return 'text-right';
             default:
-                return 'text-center';
+                return 'text-left';
         }
     };
 
-    const dividerStyles: React.CSSProperties = {
-        backgroundColor: color,
-        height: `${height}px`,
-        border: 'none',
-        borderStyle: dividerStyle,
-        width: typeof width === 'number' ? `${width}px` : width,
-        minWidth: minWidth ? `${minWidth}px` : undefined,
-        maxWidth: maxWidth ? `${maxWidth}px` : undefined,
-        minHeight: minHeight ? `${minHeight}px` : undefined,
-        maxHeight: maxHeight ? `${maxHeight}px` : undefined,
+    const getVerticalAlignClass = () => {
+        switch (verticalAlign) {
+            case 'top':
+                return 'align-top';
+            case 'middle':
+                return 'align-middle';
+            case 'bottom':
+                return 'align-bottom';
+            default:
+                return 'align-top';
+        }
+    };
+
+    const gridItemStyles: React.CSSProperties = {
+        backgroundColor,
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
         backgroundSize: backgroundImage ? 'cover' : undefined,
         backgroundPosition: backgroundImage ? 'center' : undefined,
         backgroundRepeat: backgroundImage ? 'no-repeat' : undefined,
         borderRadius,
         boxShadow,
+        width: width || '100%',
+        minWidth: minWidth ? `${minWidth}px` : undefined,
+        maxWidth: maxWidth ? `${maxWidth}px` : undefined,
         ...getSpacingStyles(padding),
         ...getMarginStyles(margin),
         ...getBorderStyles(border),
@@ -133,42 +160,32 @@ export const Divider: React.FC<DividerProps> = ({
     const combinedClasses = `
         block
         ${getAlignClass()}
+        ${getVerticalAlignClass()}
         ${className}
     `.trim().replace(/\s+/g, ' ');
 
-    // If text is provided, render a divider with text
-    if (text) {
-        const textStyles: React.CSSProperties = {
-            color: textColor || color,
-            backgroundColor: textBackgroundColor || 'transparent',
-            padding: `0 ${textPadding}px`,
-            fontSize: '14px',
-            fontWeight: 'normal',
-        };
-
-        return (
-            <div
-                className={combinedClasses}
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    ...dividerStyles,
-                }}
-                id={id}
-            >
-                <div style={{ flex: 1, height: `${height}px`, backgroundColor: color }} />
-                <span style={textStyles}>{text}</span>
-                <div style={{ flex: 1, height: `${height}px`, backgroundColor: color }} />
-            </div>
-        );
-    }
-
-    // Simple divider without text
     return (
-        <hr
+        <table
+            width="100%"
+            border={0}
+            cellSpacing={0}
+            cellPadding={0}
+            style={gridItemStyles}
             className={combinedClasses}
-            style={dividerStyles}
             id={id}
-        />
+        >
+            <tr>
+                <td
+                    align={textAlign}
+                    valign={verticalAlign}
+                    style={{
+                        textAlign,
+                        verticalAlign,
+                    }}
+                >
+                    {children}
+                </td>
+            </tr>
+        </table>
     );
 };
