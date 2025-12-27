@@ -1,15 +1,31 @@
 "use client";
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import {
     TemplateComponent,
     CANVAS_SIZES,
-    GRID_SIZE,
-    SAFE_AREA_PADDING,
     PreviewMode,
     isContainerType,
-    getDefaultComponentSize,
+    ComponentType,
 } from '../types';
 import { DragGuides } from '../hooks/useCanvasInteractions';
+import { buildComponentTree } from '../utils/htmlGenerator';
+import {
+    DndContext,
+    useSensor,
+    useSensors,
+    PointerSensor,
+    DragEndEvent,
+    DragOverlay,
+    defaultDropAnimationSideEffects,
+    DragStartEvent,
+    closestCorners,
+} from '@dnd-kit/core';
+import {
+    SortableContext,
+    rectSortingStrategy,
+    useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface BuilderCanvasProps {
     components: TemplateComponent[];
@@ -28,7 +44,6 @@ interface BuilderCanvasProps {
     onDuplicateComponent: (id: string) => void;
     onUpdateComponent: (id: string, updates: Partial<TemplateComponent>) => void;
     onAddComponent: (type: string, parentId?: string, position?: { x: number; y: number }) => void;
-    onComponentMouseDown: (e: React.MouseEvent, componentId: string) => void;
     onResizeMouseDown: (e: React.MouseEvent, componentId: string, direction: string) => void;
     onCanvasMouseMove: (e: React.MouseEvent) => void;
     onCanvasMouseUp: () => void;
@@ -39,6 +54,7 @@ interface BuilderCanvasProps {
 /**
  * Main Builder Canvas
  * Renders the design canvas with grid, components, and interactions
+ * Refactored for Tree-based / Flow Layout
  */
 export const BuilderCanvas = memo(function BuilderCanvas({
     components,
@@ -46,10 +62,8 @@ export const BuilderCanvas = memo(function BuilderCanvas({
     previewMode,
     canvasZoom,
     showGrid,
-    snapToGrid,
     isDragging,
     isResizing,
-    dragGuides,
     canvasRef,
     inlineEditing,
     onSelectComponent,
@@ -57,7 +71,6 @@ export const BuilderCanvas = memo(function BuilderCanvas({
     onDuplicateComponent,
     onUpdateComponent,
     onAddComponent,
-    onComponentMouseDown,
     onResizeMouseDown,
     onCanvasMouseMove,
     onCanvasMouseUp,
@@ -66,37 +79,94 @@ export const BuilderCanvas = memo(function BuilderCanvas({
 }: BuilderCanvasProps) {
     const canvasSize = CANVAS_SIZES[previewMode];
 
+    // Build the component tree from flat list
+    const rootComponents = useMemo(() => buildComponentTree(components), [components]);
+
+    // Recursive helper to find the deepest container under the mouse
+    const findTargetParent = useCallback((
+        clientX: number,
+        clientY: number,
+        componentType: string
+    ): string | undefined => {
+        // Elements to ignore for hit testing (dragged items, etc if needed)
+        // Using document.elementsFromPoint to find potential parents
+        const elements = document.elementsFromPoint(clientX, clientY);
+
+        // Define valid parents for each type
+        const validParentTypes: Record<string, string[]> = {
+            'Section': ['Canvas'], // Section can only be on Canvas (root)
+            'Row': ['Section'],    // Row must be in Section
+            'Column': ['Row'],     // Column must be in Row
+            'Group': ['Column', 'Section'], // Flex
+            // Elements (Text, Button, etc) must be in Column
+            'Text': ['Column'],
+            'Button': ['Column'],
+            'Image': ['Column'],
+            'Divider': ['Column'],
+            'Spacer': ['Column'],
+        };
+
+        const allowedParents = validParentTypes[componentType] || ['Column'];
+
+        for (const el of elements) {
+            const domEl = el as HTMLElement;
+            const compId = domEl.dataset.componentId;
+            const compType = domEl.dataset.componentType;
+
+            // If we found a component
+            if (compId && compType) {
+                if (allowedParents.includes(compType)) {
+                    return compId;
+                }
+            } else if (domEl.id === 'canvas-area') {
+                // We hit the canvas background
+                if (allowedParents.includes('Canvas')) {
+                    return undefined; // Undefined parentId means root/canvas
+                }
+            }
+        }
+
+        return undefined;
+    }, []);
+
     // Handle drop from component library
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
+        e.stopPropagation();
+
         const componentType = e.dataTransfer.getData('text/plain');
         if (!componentType.startsWith('library-')) return;
 
-        const canvasRect = canvasRef.current?.getBoundingClientRect();
-        if (!canvasRect) return;
-
-        const dropX = (e.clientX - canvasRect.left) / canvasZoom;
-        const dropY = (e.clientY - canvasRect.top) / canvasZoom;
-
         const actualType = componentType.replace('library-', '');
-        const compSize = getDefaultComponentSize(actualType);
 
-        // Apply safe area constraints with grid snapping
-        let finalX = Math.max(SAFE_AREA_PADDING, Math.min(dropX, canvasRect.width / canvasZoom - compSize.width - SAFE_AREA_PADDING));
-        let finalY = Math.max(SAFE_AREA_PADDING, Math.min(dropY, canvasRect.height / canvasZoom - compSize.height - SAFE_AREA_PADDING));
+        // Find the valid parent for this component type at the drop location
+        const targetParentId = findTargetParent(e.clientX, e.clientY, actualType);
 
-        if (snapToGrid) {
-            finalX = Math.round(finalX / GRID_SIZE) * GRID_SIZE;
-            finalY = Math.round(finalY / GRID_SIZE) * GRID_SIZE;
+        // If strict nesting rules fail, we might want to auto-wrap? 
+        // For now, let's try to just add it. The undefined parentId means root.
+        // If a Button is dropped on Root, we should probably wrap it in Section->Row->Column automatically
+        // But for this step, let's assume the user targets correctly or we enforce simple rules.
+
+        // AUTO-WRAPPING LOGIC (Simple version)
+        // If dropped on Root but needs to be in something else
+        if (targetParentId === undefined && actualType !== 'Section') {
+            // If we drop a specialized element on the canvas, we could simply not allow it,
+            // or creates a new Section structure.
+            // For now, let's allow adding to root if no parent found, 
+            // but visually it might look broken if we enforce styles.
+            // Let's rely on onAddComponent to handle or just let it float at top if supported.
         }
 
-        onAddComponent(actualType, undefined, { x: finalX, y: finalY });
-    }, [canvasRef, canvasZoom, snapToGrid, onAddComponent]);
+        // We don't really care about X/Y for flow layout, just order.
+        // But we'll pass 0,0 for now.
+        onAddComponent(actualType, targetParentId, { x: 0, y: 0 });
+
+    }, [findTargetParent, onAddComponent]);
 
     return (
-        <div className="bg-gray-900 rounded-xl border border-gray-700/50 overflow-hidden">
+        <div className="bg-gray-900 rounded-xl border border-gray-700/50 overflow-hidden h-full flex flex-col">
             {/* Canvas Header */}
-            <div className="bg-gray-800/50 px-4 py-2 border-b border-gray-700/50">
+            <div className="bg-gray-800/50 px-4 py-2 border-b border-gray-700/50 shrink-0">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1">
@@ -108,21 +178,16 @@ export const BuilderCanvas = memo(function BuilderCanvas({
                         <span className="text-xs text-gray-400 bg-gray-700/50 px-2 py-0.5 rounded">
                             {components.length} components
                         </span>
-                        {(isDragging || isResizing) && (
-                            <span className="text-xs text-blue-400 animate-pulse">
-                                {isDragging ? '• Moving' : '• Resizing'}
-                            </span>
-                        )}
                     </div>
                     <div className="text-xs text-gray-400">
-                        {canvasSize.width} × {canvasSize.height}px
+                        {canvasSize.width}px width
                     </div>
                 </div>
             </div>
 
             {/* Canvas Area */}
             <div
-                className="p-6 bg-linear-to-br from-gray-900 via-gray-800 to-gray-900 overflow-auto"
+                className="flex-1 bg-gray-900 overflow-auto flex justify-center p-8 transition-colors"
                 onMouseMove={onCanvasMouseMove}
                 onMouseUp={onCanvasMouseUp}
                 onMouseLeave={onCanvasMouseUp}
@@ -134,14 +199,17 @@ export const BuilderCanvas = memo(function BuilderCanvas({
             >
                 <div
                     ref={canvasRef}
-                    id="canvas"
-                    className="relative mx-auto bg-white rounded-lg shadow-2xl overflow-hidden ring-1 ring-gray-200/20"
+                    id="canvas-area"
+                    className="relative bg-white shadow-2xl border border-gray-100 transition-all duration-300 min-h-[800px] flex flex-col mx-auto my-8 ring-1 ring-gray-900/5"
                     style={{
                         width: `${canvasSize.width}px`,
-                        height: `${canvasSize.height}px`,
                         transform: `scale(${canvasZoom})`,
                         transformOrigin: 'top center',
-                        transition: 'width 0.3s, height 0.3s',
+                        backgroundImage: showGrid ? `
+                            linear-gradient(90deg, #f3f4f6 1px, transparent 1px),
+                            linear-gradient(#f3f4f6 1px, transparent 1px)
+                        ` : 'none',
+                        backgroundSize: '20px 20px',
                     }}
                     onClick={(e) => {
                         if (e.target === e.currentTarget) {
@@ -149,91 +217,32 @@ export const BuilderCanvas = memo(function BuilderCanvas({
                         }
                     }}
                 >
-                    {/* Drag Guides */}
-                    {dragGuides && (isDragging || isResizing) && (
-                        <>
-                            <div
-                                className="absolute top-0 bottom-0 w-px bg-blue-500/60 pointer-events-none z-50"
-                                style={{ left: dragGuides.x }}
-                            />
-                            <div
-                                className="absolute left-0 right-0 h-px bg-blue-500/60 pointer-events-none z-50"
-                                style={{ top: dragGuides.y }}
-                            />
-                        </>
-                    )}
-
-                    {/* Grid Background */}
-                    {showGrid && (
-                        <div
-                            className="absolute inset-0 pointer-events-none"
-                            style={{
-                                backgroundImage: `
-                                    linear-gradient(90deg, #e5e7eb 1px, transparent 1px),
-                                    linear-gradient(#e5e7eb 1px, transparent 1px)
-                                `,
-                                backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-                                opacity: 0.4,
-                            }}
-                        />
-                    )}
-
-                    {/* Safe Area Indicator */}
-                    <div
-                        className="absolute pointer-events-none border border-dashed border-emerald-400/40 rounded"
-                        style={{
-                            top: SAFE_AREA_PADDING,
-                            left: SAFE_AREA_PADDING,
-                            right: SAFE_AREA_PADDING,
-                            bottom: SAFE_AREA_PADDING,
-                        }}
-                    >
-                        <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 text-[10px] text-emerald-500 bg-white px-1.5 py-0.5 rounded-full">
-                            Safe Area
-                        </div>
-                    </div>
-
-                    {/* Components */}
-                    {components.map((component) => (
+                    {/* Render Root Components (Sections) */}
+                    {rootComponents.map((component) => (
                         <CanvasComponent
                             key={component.id}
                             component={component}
-                            isSelected={selectedComponent === component.id}
-                            isDragging={isDragging && selectedComponent === component.id}
+                            selectedId={selectedComponent}
+                            isDragging={isDragging}
                             isResizing={isResizing}
-                            inlineEditing={inlineEditing === component.id}
-                            onSelect={() => onSelectComponent(component.id)}
-                            onDelete={() => onDeleteComponent(component.id)}
-                            onDuplicate={() => onDuplicateComponent(component.id)}
-                            onUpdate={(updates) => onUpdateComponent(component.id, updates)}
-                            onMouseDown={(e) => onComponentMouseDown(e, component.id)}
-                            onResizeMouseDown={(e, dir) => onResizeMouseDown(e, component.id, dir)}
-                            onDoubleClick={() => {
-                                if (['Text', 'Button'].includes(component.type)) {
-                                    onSetInlineEditing(component.id);
-                                }
-                            }}
+                            inlineEditing={inlineEditing}
+                            onSelect={onSelectComponent}
+                            onDelete={onDeleteComponent}
+                            onDuplicate={onDuplicateComponent}
+                            onUpdate={onUpdateComponent}
+                            onResizeMouseDown={onResizeMouseDown}
+                            onDoubleClick={() => { }}
+                            showGrid={showGrid}
                             onSetInlineEditing={onSetInlineEditing}
-                            onOpenEditor={() => onOpenEditor(component)}
+                            onOpenEditor={onOpenEditor}
                         />
                     ))}
 
-                    {/* Empty State */}
-                    {components.length === 0 && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
-                            <div className="text-6xl mb-4 opacity-30">📧</div>
-                            <h3 className="text-lg font-medium text-gray-500 mb-2">
-                                Start Building
-                            </h3>
-                            <p className="text-sm text-gray-400 mb-4">
-                                Drag components from the library
-                            </p>
-                            <div className="text-xs text-gray-500 space-y-1 text-center">
-                                <p>📦 Drag to add components</p>
-                                <p>🖱️ Click to select</p>
-                                <p>↔️ Drag corners to resize</p>
-                                <p>✏️ Double-click text to edit</p>
-                            </div>
+                    {/* Empty State / Dropzone hint */}
+                    {rootComponents.length === 0 && (
+                        <div className="flex-1 flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-200 m-4 rounded-lg">
+                            <p className="text-lg font-medium">Drop a Section here</p>
+                            <p className="text-sm text-gray-400">Start with a layout section</p>
                         </div>
                     )}
                 </div>
@@ -242,27 +251,95 @@ export const BuilderCanvas = memo(function BuilderCanvas({
     );
 });
 
-// Individual Canvas Component - renders a simplified WYSIWYG preview
+// Recursive Canvas Component
 interface CanvasComponentProps {
     component: TemplateComponent;
-    isSelected: boolean;
+    selectedId: string | null;
     isDragging: boolean;
     isResizing: boolean;
-    inlineEditing: boolean;
-    onSelect: () => void;
-    onDelete: () => void;
-    onDuplicate: () => void;
-    onUpdate: (updates: Partial<TemplateComponent>) => void;
-    onMouseDown: (e: React.MouseEvent) => void;
-    onResizeMouseDown: (e: React.MouseEvent, direction: string) => void;
-    onDoubleClick: () => void;
+    inlineEditing: string | null;
+    onSelect: (id: string) => void;
+    onDelete: (id: string) => void;
+    onDuplicate: (id: string) => void;
+    onUpdate: (id: string, updates: Partial<TemplateComponent>) => void;
+    onResizeMouseDown: (e: React.MouseEvent, componentId: string, direction: string) => void;
+    onDoubleClick: (e: React.MouseEvent) => void;
+    showGrid: boolean;
     onSetInlineEditing: (id: string | null) => void;
-    onOpenEditor: () => void;
+    onOpenEditor: (component: TemplateComponent) => void;
 }
 
+
+
+// Internal ResizeHandles Component
+// Internal ResizeHandles Component
+const ResizeHandles = ({
+    componentId,
+    width,
+    height,
+    onResizeStart
+}: {
+    componentId: string;
+    width: number;
+    height: number;
+    onResizeStart: (e: React.MouseEvent, direction: string) => void;
+}) => {
+    const handles = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
+
+    const getHandleStyle = (dir: string): React.CSSProperties => {
+        const style: React.CSSProperties = {
+            position: 'absolute',
+            width: '10px',
+            height: '10px',
+            backgroundColor: '#3b82f6',
+            border: '1px solid white',
+            borderRadius: '50%',
+            zIndex: 50,
+            transform: 'translate(-50%, -50%)', // Center the handle on the point
+        };
+
+        // Vertical position
+        if (dir.includes('n')) style.top = '0%';
+        else if (dir.includes('s')) style.top = '100%';
+        else style.top = '50%';
+
+        // Horizontal position
+        if (dir.includes('w')) style.left = '0%';
+        else if (dir.includes('e')) style.left = '100%';
+        else style.left = '50%';
+
+        // Cursor
+        if (dir === 'n' || dir === 's') style.cursor = 'ns-resize';
+        else if (dir === 'e' || dir === 'w') style.cursor = 'ew-resize';
+        else if (dir === 'ne' || dir === 'sw') style.cursor = 'nesw-resize';
+        else if (dir === 'nw' || dir === 'se') style.cursor = 'nwse-resize';
+
+        return style;
+    };
+
+    return (
+        <>
+            {handles.map(dir => (
+                <div
+                    key={dir}
+                    data-direction={dir}
+                    onMouseDown={(e) => onResizeStart(e, dir)}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    style={getHandleStyle(dir)}
+                />
+            ))}
+            {/* Dimensions label during resize */}
+            <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
+                {Math.round(width)} × {Math.round(height)}
+            </div>
+        </>
+    );
+};
+
+// Recursive Component for Canvas
 const CanvasComponent = memo(function CanvasComponent({
     component,
-    isSelected,
+    selectedId,
     isDragging,
     isResizing,
     inlineEditing,
@@ -270,308 +347,257 @@ const CanvasComponent = memo(function CanvasComponent({
     onDelete,
     onDuplicate,
     onUpdate,
-    onMouseDown,
     onResizeMouseDown,
     onDoubleClick,
+    showGrid,
     onSetInlineEditing,
     onOpenEditor,
 }: CanvasComponentProps) {
+    const isSelected = selectedId === component.id;
     const isContainer = isContainerType(component.type);
-    const style = component.style || {};
-    const props = component.props || {};
 
-    // Base wrapper style - just for positioning
-    const wrapperStyle: React.CSSProperties = {
-        position: 'absolute',
-        left: component.position?.x || 0,
-        top: component.position?.y || 0,
-        width: component.size?.width || 150,
-        height: component.size?.height || 100,
-        zIndex: isSelected ? 100 : (style.zIndex || 0),
-        cursor: isDragging ? 'grabbing' : 'grab',
-        transition: isDragging || isResizing ? 'none' : 'box-shadow 0.2s',
-    };
-
-    // Component content style - the actual visual appearance
-    const contentStyle: React.CSSProperties = {
-        width: '100%',
-        height: '100%',
-        backgroundColor: style.backgroundColor || '#ffffff',
-        color: style.textColor || '#000000',
-        fontSize: style.fontSize || '14px',
-        fontFamily: style.fontFamily || 'Arial, sans-serif',
-        fontWeight: style.fontWeight || 'normal',
-        padding: style.padding || '0',
-        borderRadius: style.borderRadius || '0',
-        border: style.border || 'none',
-        textAlign: (style.textAlign as React.CSSProperties['textAlign']) || 'center',
-        display: 'flex',
-        alignItems: style.alignItems || 'center',
-        justifyContent: style.justifyContent || 'center',
-        overflow: 'hidden',
-        boxSizing: 'border-box',
-    };
-
-    // Render component content based on type
-    const renderContent = () => {
-        switch (component.type) {
-            case 'Button':
-                return (
-                    <div
-                        style={{
-                            ...contentStyle,
-                            backgroundColor: style.backgroundColor || '#3b82f6',
-                            color: style.textColor || '#ffffff',
-                            fontWeight: style.fontWeight || '600',
-                        }}
-                    >
-                        {String(props.children || 'Click Me')}
-                    </div>
-                );
-
-            case 'Text':
-                return (
-                    <div
-                        style={{
-                            ...contentStyle,
-                            backgroundColor: style.backgroundColor || 'transparent',
-                            justifyContent: style.textAlign === 'left' ? 'flex-start' : style.textAlign === 'right' ? 'flex-end' : 'center',
-                            padding: style.padding || '8px',
-                        }}
-                    >
-                        {String(props.children || 'Your text here')}
-                    </div>
-                );
-
-            case 'Image':
-                return (
-                    <div style={{ ...contentStyle, padding: 0 }}>
-                        <img
-                            src={(props.src as string) || 'https://via.placeholder.com/200x150'}
-                            alt={(props.alt as string) || 'Image'}
-                            style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                borderRadius: style.borderRadius || '0',
-                            }}
-                        />
-                    </div>
-                );
-
-            case 'Divider':
-                return (
-                    <div
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '0 8px',
-                        }}
-                    >
-                        <div
-                            style={{
-                                width: '100%',
-                                height: String(props.thickness || '2px'),
-                                backgroundColor: style.backgroundColor || '#e5e7eb',
-                            }}
-                        />
-                    </div>
-                );
-
-            case 'Section':
-                return (
-                    <div
-                        style={{
-                            ...contentStyle,
-                            backgroundColor: style.backgroundColor || '#f0f9ff',
-                            border: style.border || '2px solid #bae6fd',
-                        }}
-                    >
-                        {String(props.children || component.type)}
-                    </div>
-                );
-
-            case 'Row':
-                return (
-                    <div
-                        style={{
-                            ...contentStyle,
-                            backgroundColor: style.backgroundColor || 'transparent',
-                            border: '1px dashed #3b82f6',
-                            gap: style.gap || '16px',
-                        }}
-                    >
-                        {String(props.children || 'Row')}
-                    </div>
-                );
-
-            case 'Column':
-                return (
-                    <div
-                        style={{
-                            ...contentStyle,
-                            backgroundColor: style.backgroundColor || 'transparent',
-                            border: '1px dashed #10b981',
-                            flexDirection: 'column',
-                        }}
-                    >
-                        {String(props.children || 'Column')}
-                    </div>
-                );
-
-            case 'Group':
-                return (
-                    <div
-                        style={{
-                            ...contentStyle,
-                            backgroundColor: style.backgroundColor || 'transparent',
-                            border: '1px dashed #f59e0b',
-                        }}
-                    >
-                        {String(props.children || 'Group')}
-                    </div>
-                );
-
-            case 'Spacer':
-                return (
-                    <div
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                            backgroundColor: 'transparent',
-                            border: '1px dashed #ccc',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '10px',
-                            color: '#999',
-                        }}
-                    >
-                        Spacer
-                    </div>
-                );
-
-            default:
-                return (
-                    <div style={contentStyle}>
-                        {component.type}
-                    </div>
-                );
+    // Setup Sortable for DnD
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging: isSortableDragging
+    } = useSortable({
+        id: component.id,
+        data: {
+            type: component.type,
+            isContainer
         }
+    });
+
+    const style = component.style || {};
+
+    // Calculate final style
+    const finalStyle: any = {
+        ...style,
+        position: 'relative', // Flow layout
+        width: component.size?.width ? `${component.size.width}px` : style.width || '100%',
+        height: component.size?.height ? `${component.size.height}px` : style.height || 'auto',
+        minHeight: isContainer ? '50px' : 'auto', // Ensure containers are droppable
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isSortableDragging ? 0.3 : (style.opacity || 1),
+        border: isSelected
+            ? '2px solid #3b82f6'
+            : isContainer
+                ? '1px dashed #e5e7eb'
+                : '1px dashed transparent',
+        outline: 'none',
+        zIndex: isSelected ? 10 : 1,
     };
+
+
+    const handleExtensionClick = (e: React.MouseEvent, action: 'delete' | 'duplicate' | 'edit') => {
+        e.stopPropagation();
+        if (action === 'delete') onDelete(component.id);
+        if (action === 'duplicate') onDuplicate(component.id);
+        if (action === 'edit') onOpenEditor(component);
+    };
+
+    // Render children if container
+    const childrenIds = (component.children || []).map(c => c.id);
 
     return (
         <div
-            style={wrapperStyle}
-            className={`group ${isSelected ? 'ring-2 ring-blue-500 ring-offset-1' : 'hover:ring-2 hover:ring-gray-400'}`}
+            ref={setNodeRef}
+            style={finalStyle}
+            id={component.id}
+            data-component-type={component.type}
+            className={`group relative ${isSelected ? 'z-40' : 'z-auto'} ${isContainer ? 'min-h-[50px]' : ''} `}
             onClick={(e) => {
                 e.stopPropagation();
-                onSelect();
+                onSelect(component.id);
             }}
-            onMouseDown={onMouseDown}
-            onDoubleClick={onDoubleClick}
+            onDoubleClick={(e) => {
+                e.stopPropagation();
+                if (component.type === 'Text') onSetInlineEditing(component.id);
+                else onOpenEditor(component);
+            }}
+            {...attributes}
+            {...listeners}
         >
-            {/* Inline Editing for Text/Button */}
-            {inlineEditing ? (
-                <input
-                    type="text"
-                    defaultValue={(props.children as string) || ''}
-                    autoFocus
-                    className="absolute inset-0 w-full h-full bg-white border-2 border-blue-500 outline-none px-3 py-2 text-sm z-10"
+            {/* Header / Label for Containers (on selection or hover) */}
+            {(isSelected || isContainer) && (
+                <div className={`
+                    absolute top-0 left-0 px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider rounded-br shadow-xs z-50 pointer-events-none transition-opacity
+                    ${isSelected ? 'bg-blue-600 text-white opacity-100' : 'bg-gray-100/80 text-gray-500 opacity-0 group-hover:opacity-100'}
+                `}>
+                    {component.type}
+                </div>
+            )}
+
+            {/* Action Buttons for Selected Component */}
+            {isSelected && !isDragging && (
+                <div
+                    className="absolute -top-3 -right-3 flex gap-1 z-50"
+                    onPointerDown={(e) => e.stopPropagation()} // Prevent DnD start
+                >
+                    <button onClick={(e) => handleExtensionClick(e, 'duplicate')} className="p-1 bg-white border border-gray-200 rounded-full shadow-sm hover:bg-gray-50 text-gray-600" title="Duplicate">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    </button>
+                    <button onClick={(e) => handleExtensionClick(e, 'edit')} className="p-1 bg-white border border-gray-200 rounded-full shadow-sm hover:bg-gray-50 text-blue-600" title="Edit">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    </button>
+                    <button onClick={(e) => handleExtensionClick(e, 'delete')} className="p-1 bg-white border border-gray-200 rounded-full shadow-sm hover:bg-red-50 text-red-600" title="Delete">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+            )}
+
+            {/* Content */}
+            <ComponentContent component={component} />
+
+            {/* Component Content (Recursive) */}
+            {isContainer && !component.isLocked && (
+                <div
+                    className={`relative w-full transition-all duration-200 overflow-hidden`}
                     style={{
-                        color: style.textColor || '#000',
-                        textAlign: (style.textAlign as React.CSSProperties['textAlign']) || 'center',
+                        minHeight: component.children?.length === 0 ? '40px' : undefined,
+                        display: component.style?.display || (['Row', 'Group'].includes(component.type) ? 'flex' : 'block'),
+                        flexDirection: (component.style?.flexDirection as any) || 'row',
+                        justifyContent: component.style?.justifyContent || 'flex-start',
+                        alignItems: component.style?.alignItems || 'stretch',
+                        gap: component.style?.gap || '0px',
+                        flexWrap: 'wrap',
+                        maxWidth: '100%',
                     }}
-                    onBlur={(e) => {
-                        onUpdate({ props: { ...props, children: e.target.value } });
-                        onSetInlineEditing(null);
-                    }}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                            onUpdate({ props: { ...props, children: (e.target as HTMLInputElement).value } });
-                            onSetInlineEditing(null);
-                        }
-                        if (e.key === 'Escape') {
-                            onSetInlineEditing(null);
-                        }
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                />
-            ) : (
-                renderContent()
+                >
+                    <SortableContext items={childrenIds} strategy={rectSortingStrategy}>
+                        {component.children?.map(child => (
+                            <CanvasComponent
+                                key={child.id}
+                                component={child}
+                                selectedId={selectedId}
+                                isDragging={isDragging}
+                                isResizing={isResizing}
+                                inlineEditing={inlineEditing}
+                                showGrid={showGrid}
+                                onSelect={onSelect}
+                                onDelete={onDelete}
+                                onDuplicate={onDuplicate}
+                                onUpdate={onUpdate}
+                                onResizeMouseDown={onResizeMouseDown}
+                                onDoubleClick={onDoubleClick}
+                                onSetInlineEditing={onSetInlineEditing}
+                                onOpenEditor={onOpenEditor}
+                            />
+                        ))}
+                    </SortableContext>
+                    {component.children?.length === 0 && (
+                        <div className={`w-full h-full min-h-[40px] flex items-center justify-center text-xs text-gray-400 bg-gray-50/50 border border-dashed rounded ${showGrid ? 'border-gray-200' : 'border-transparent'}`}>
+                            Drop {component.type === 'Section' ? 'Rows' : component.type === 'Row' ? 'Columns' : 'Elements'} here
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* Action Buttons */}
-            <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-50">
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenEditor();
-                    }}
-                    className="w-5 h-5 bg-gray-700 hover:bg-gray-600 text-white rounded-full flex items-center justify-center text-[10px] shadow-lg"
-                    title="Edit"
-                >
-                    ⚙
-                </button>
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete();
-                    }}
-                    className="w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-lg"
-                    title="Delete"
-                >
-                    ×
-                </button>
-            </div>
-
-            {/* Resize Handles */}
-            {isSelected && !isDragging && (
-                <ResizeHandles onResizeMouseDown={onResizeMouseDown} />
+            {isContainer && !isResizing && !isDragging && (
+                <div className="absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                    <div className="flex gap-1 bg-white shadow-lg rounded p-1 border border-gray-200">
+                        <button title="Edit properties" onClick={(e) => handleExtensionClick(e, 'edit')} className="p-1 hover:bg-gray-100 rounded text-gray-600">✏️</button>
+                        <button title="Duplicate" onClick={(e) => handleExtensionClick(e, 'duplicate')} className="p-1 hover:bg-gray-100 rounded text-blue-600">📄</button>
+                        <button title="Delete" onClick={(e) => handleExtensionClick(e, 'delete')} className="p-1 hover:bg-red-50 rounded text-red-600">🗑️</button>
+                    </div>
+                </div>
+            )}
+            {!isContainer && isSelected && !isResizing && !isDragging && (
+                <div className="absolute -top-9 right-0 p-1 z-50">
+                    <div className="flex gap-1 bg-white shadow-lg rounded p-1 border border-gray-200">
+                        <button title="Edit properties" onClick={(e) => handleExtensionClick(e, 'edit')} className="p-1 hover:bg-gray-100 rounded text-gray-600">✏️</button>
+                        <button title="Duplicate" onClick={(e) => handleExtensionClick(e, 'duplicate')} className="p-1 hover:bg-gray-100 rounded text-blue-600">📄</button>
+                        <button title="Delete" onClick={(e) => handleExtensionClick(e, 'delete')} className="p-1 hover:bg-red-50 rounded text-red-600">🗑️</button>
+                    </div>
+                </div>
             )}
 
-            {/* Container Indicator */}
-            {isContainer && (
-                <div className="absolute inset-0 border-2 border-dashed border-blue-300/0 group-hover:border-blue-300/50 pointer-events-none transition-colors rounded" />
+            {/* Resize Handles */}
+            {isSelected && component.constraints?.resizable !== false && (
+                <ResizeHandles
+                    componentId={component.id}
+                    width={component.size?.width || 0}
+                    height={component.size?.height || 0}
+                    onResizeStart={(e, dir) => onResizeMouseDown(e, component.id, dir)}
+                />
             )}
         </div>
     );
 });
 
-// Resize handles component
-interface ResizeHandlesProps {
-    onResizeMouseDown: (e: React.MouseEvent, direction: string) => void;
-}
+// Helper for leaf content rendering
+const ComponentContent = ({ component }: { component: TemplateComponent }) => {
+    const { type, props, style = {} } = component;
 
-const ResizeHandles = memo(function ResizeHandles({ onResizeMouseDown }: ResizeHandlesProps) {
-    const handles = [
-        { dir: 'nw', cursor: 'nw-resize', pos: { left: -4, top: -4 } },
-        { dir: 'n', cursor: 'n-resize', pos: { left: '50%', top: -4, transform: 'translateX(-50%)' } },
-        { dir: 'ne', cursor: 'ne-resize', pos: { right: -4, top: -4 } },
-        { dir: 'e', cursor: 'e-resize', pos: { right: -4, top: '50%', transform: 'translateY(-50%)' } },
-        { dir: 'se', cursor: 'se-resize', pos: { right: -4, bottom: -4 } },
-        { dir: 's', cursor: 's-resize', pos: { left: '50%', bottom: -4, transform: 'translateX(-50%)' } },
-        { dir: 'sw', cursor: 'sw-resize', pos: { left: -4, bottom: -4 } },
-        { dir: 'w', cursor: 'w-resize', pos: { left: -4, top: '50%', transform: 'translateY(-50%)' } },
-    ];
+    // Default stylings for leaf nodes
+    const contentStyle: React.CSSProperties = {
+        color: style.textColor || 'inherit',
+        fontSize: style.fontSize || 'inherit',
+        fontFamily: style.fontFamily || 'inherit',
+        textAlign: (style.textAlign as any) || 'left',
+        width: '100%',
+        maxWidth: '100%',
+        overflow: 'hidden',
+    };
 
-    return (
-        <>
-            {handles.map(({ dir, cursor, pos }) => (
+    switch (type) {
+        case 'Button':
+            return (
+                <div style={{ textAlign: (style.textAlign as any) || 'center', width: '100%' }}>
+                    <button
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                        style={{
+                            backgroundColor: style.backgroundColor,
+                            color: style.textColor,
+                            borderRadius: style.borderRadius,
+                            ...contentStyle,
+                            width: 'auto', // Button is inline-block usually
+                        }}
+                    >
+                        {String(props.children || 'Click Me')}
+                    </button>
+                </div>
+            );
+        case 'Text':
+            return (
+                <div style={contentStyle}>
+                    {String(props.children || 'Lorem ipsum text block')}
+                </div>
+            );
+        case 'Image':
+            return (
+                <div style={{ width: '100%', overflow: 'hidden' }}>
+                    <img
+                        src={String(props.src || 'https://via.placeholder.com/150')}
+                        alt={String(props.alt || '')}
+                        className="max-w-full h-auto block object-contain"
+                        style={{ borderRadius: style.borderRadius, maxWidth: '100%' }}
+                    />
+                </div>
+            );
+        case 'Divider':
+            return <div className="py-2 w-full"><hr className="border-gray-300 w-full" style={{ borderColor: style.backgroundColor, borderTopWidth: props.thickness ? String(props.thickness) : '1px' }} /></div>;
+        case 'Spacer':
+            return (
                 <div
-                    key={dir}
-                    className="absolute w-2.5 h-2.5 bg-blue-500 border border-white rounded-full hover:scale-125 transition-transform z-50"
-                    style={{ ...pos, cursor } as React.CSSProperties}
-                    onMouseDown={(e) => {
-                        e.stopPropagation();
-                        onResizeMouseDown(e, dir);
-                    }}
-                />
-            ))}
-        </>
-    );
-});
+                    className="w-full relative group"
+                    style={{ height: props.height ? String(props.height) + 'px' : '20px' }}
+                >
+                    {/* Visual hint for spacer in builder */}
+                    <div className="absolute inset-0 border border-dashed border-gray-300 bg-gray-50/30 opacity-50 group-hover:opacity-100 pointer-events-none flex items-center justify-center">
+                        <span className="text-[10px] text-gray-400 hidden group-hover:block">Spacer</span>
+                    </div>
+                </div>
+            );
+        default:
+            return <div className="text-gray-400 text-xs">{type} Block</div>;
+    }
+};
 
 export default BuilderCanvas;

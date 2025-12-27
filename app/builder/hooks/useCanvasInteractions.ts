@@ -34,7 +34,6 @@ export interface UseCanvasInteractionsReturn {
     canvasRef: React.RefObject<HTMLDivElement | null>;
 
     // Handlers
-    handleComponentMouseDown: (e: React.MouseEvent, componentId: string) => void;
     handleResizeMouseDown: (e: React.MouseEvent, componentId: string, direction: string) => void;
     handleCanvasMouseMove: (e: React.MouseEvent) => void;
     handleCanvasMouseUp: () => void;
@@ -79,26 +78,7 @@ export function useCanvasInteractions({
         };
     }, [previewMode]);
 
-    // Handle component mouse down for dragging
-    const handleComponentMouseDown = useCallback((e: React.MouseEvent, componentId: string) => {
-        e.stopPropagation();
 
-        const component = components.find(c => c.id === componentId);
-        if (!component) return;
-
-        setSelectedComponent(componentId);
-        setIsDragging(true);
-
-        const rect = canvasRef.current?.getBoundingClientRect();
-        if (rect) {
-            const mouseX = (e.clientX - rect.left) / canvasZoom;
-            const mouseY = (e.clientY - rect.top) / canvasZoom;
-            setDragOffset({
-                x: mouseX - (component.position?.x || 0),
-                y: mouseY - (component.position?.y || 0),
-            });
-        }
-    }, [components, setSelectedComponent, canvasZoom]);
 
     // Handle resize mouse down
     const handleResizeMouseDown = useCallback((e: React.MouseEvent, componentId: string, direction: string) => {
@@ -129,29 +109,6 @@ export function useCanvasInteractions({
         const boundaries = getCanvasBoundaries();
         const rect = canvasRef.current?.getBoundingClientRect();
         if (!rect) return;
-
-        if (isDragging) {
-            const mouseX = (e.clientX - rect.left) / canvasZoom;
-            const mouseY = (e.clientY - rect.top) / canvasZoom;
-
-            let newX = mouseX - dragOffset.x;
-            let newY = mouseY - dragOffset.y;
-
-            // Apply grid snapping
-            if (snapToGrid) {
-                newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
-                newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
-            }
-
-            // Apply safe area constraints
-            const compWidth = component.size?.width || 150;
-            const compHeight = component.size?.height || 100;
-            newX = Math.max(SAFE_AREA_PADDING, Math.min(newX, boundaries.width - compWidth - SAFE_AREA_PADDING));
-            newY = Math.max(SAFE_AREA_PADDING, Math.min(newY, boundaries.height - compHeight - SAFE_AREA_PADDING));
-
-            updateComponentPosition(component.id, newX, newY);
-            setDragGuides({ x: newX, y: newY });
-        }
 
         if (isResizing) {
             const deltaX = (e.clientX - resizeStart.x) / canvasZoom;
@@ -242,7 +199,6 @@ export function useCanvasInteractions({
         isResizing,
         dragGuides,
         canvasRef,
-        handleComponentMouseDown,
         handleResizeMouseDown,
         handleCanvasMouseMove,
         handleCanvasMouseUp,

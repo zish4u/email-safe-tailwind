@@ -17,7 +17,8 @@ export const PreviewPanel = memo(function PreviewPanel({
     isOpen,
     onClose,
 }: PreviewPanelProps) {
-    const [html, setHtml] = useState('');
+    const [previewHtml, setPreviewHtml] = useState('');
+    const [codeHtml, setCodeHtml] = useState('');
     const [previewMode, setPreviewMode] = useState<PreviewMode>('desktop');
     const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview');
     const [preheaderText, setPreheaderText] = useState('');
@@ -26,22 +27,31 @@ export const PreviewPanel = memo(function PreviewPanel({
     // Generate HTML when components change
     useEffect(() => {
         if (isOpen && components.length > 0) {
-            const generated = generateEmailHtml(components, {
+            // Generate web-friendly HTML for the preview iframe
+            const webHtml = generateEmailHtml(components, {
                 preheaderText: preheaderText || undefined,
+                mode: 'web'
             });
-            setHtml(generated);
+            setPreviewHtml(webHtml);
+
+            // Generate email-client-safe HTML for the code view and export
+            const emailHtml = generateEmailHtml(components, {
+                preheaderText: preheaderText || undefined,
+                mode: 'email'
+            });
+            setCodeHtml(emailHtml);
         }
     }, [components, isOpen, preheaderText]);
 
     const handleCopy = useCallback(() => {
-        navigator.clipboard.writeText(html).then(() => {
+        navigator.clipboard.writeText(codeHtml).then(() => {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         });
-    }, [html]);
+    }, [codeHtml]);
 
     const handleDownload = useCallback(() => {
-        const blob = new Blob([html], { type: 'text/html' });
+        const blob = new Blob([codeHtml], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -50,7 +60,7 @@ export const PreviewPanel = memo(function PreviewPanel({
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }, [html]);
+    }, [codeHtml]);
 
     if (!isOpen) return null;
 
@@ -69,8 +79,8 @@ export const PreviewPanel = memo(function PreviewPanel({
                             <button
                                 onClick={() => setActiveTab('preview')}
                                 className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'preview'
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-gray-400 hover:text-white'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-gray-400 hover:text-white'
                                     }`}
                             >
                                 👁️ Preview
@@ -78,8 +88,8 @@ export const PreviewPanel = memo(function PreviewPanel({
                             <button
                                 onClick={() => setActiveTab('code')}
                                 className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'code'
-                                        ? 'bg-blue-600 text-white'
-                                        : 'text-gray-400 hover:text-white'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-gray-400 hover:text-white'
                                     }`}
                             >
                                 💻 HTML Code
@@ -90,16 +100,16 @@ export const PreviewPanel = memo(function PreviewPanel({
                     <div className="flex items-center gap-3">
                         {/* Device toggle */}
                         <div className="flex bg-gray-800 rounded-lg p-1">
-                            {(['desktop', 'tablet', 'mobile'] as const).map((mode) => (
+                            {(['desktop', 'mobile'] as const).map((mode) => (
                                 <button
                                     key={mode}
                                     onClick={() => setPreviewMode(mode)}
                                     className={`px-3 py-1.5 rounded-md text-sm transition-colors ${previewMode === mode
-                                            ? 'bg-gray-700 text-white'
-                                            : 'text-gray-400 hover:text-white'
+                                        ? 'bg-gray-700 text-white'
+                                        : 'text-gray-400 hover:text-white'
                                         }`}
                                 >
-                                    {mode === 'desktop' ? '🖥️' : mode === 'tablet' ? '📱' : '📲'}
+                                    {mode === 'desktop' ? '🖥️' : '📲'}
                                 </button>
                             ))}
                         </div>
@@ -124,7 +134,7 @@ export const PreviewPanel = memo(function PreviewPanel({
                                     style={{ width: previewWidth }}
                                 >
                                     <iframe
-                                        srcDoc={html}
+                                        srcDoc={previewHtml}
                                         title="Email Preview"
                                         className="w-full border-0"
                                         style={{ height: '600px' }}
@@ -135,7 +145,7 @@ export const PreviewPanel = memo(function PreviewPanel({
                         ) : (
                             <div className="h-full overflow-auto bg-gray-950 p-4">
                                 <pre className="text-sm text-emerald-400 font-mono whitespace-pre-wrap break-words">
-                                    {html || 'No HTML generated yet'}
+                                    {codeHtml || 'No HTML generated yet'}
                                 </pre>
                             </div>
                         )}
@@ -184,8 +194,8 @@ export const PreviewPanel = memo(function PreviewPanel({
                                 <button
                                     onClick={handleCopy}
                                     className={`w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${copied
-                                            ? 'bg-green-600 text-white'
-                                            : 'bg-blue-600 hover:bg-blue-500 text-white'
+                                        ? 'bg-green-600 text-white'
+                                        : 'bg-blue-600 hover:bg-blue-500 text-white'
                                         }`}
                                 >
                                     {copied ? '✓ Copied!' : '📋 Copy HTML'}
@@ -215,7 +225,7 @@ export const PreviewPanel = memo(function PreviewPanel({
                 {/* Footer */}
                 <div className="px-6 py-3 border-t border-gray-700 bg-gray-800/50 flex items-center justify-between">
                     <div className="text-xs text-gray-500">
-                        {html.length.toLocaleString()} characters • {components.length} components
+                        {codeHtml.length.toLocaleString()} characters • {components.length} components
                     </div>
                     <div className="flex items-center gap-2">
                         <button

@@ -9,8 +9,11 @@ import {
     PointerSensor,
     useSensor,
     useSensors,
-    closestCorners
+    pointerWithin
 } from '@dnd-kit/core';
+import { restrictToWindowEdges } from '@dnd-kit/modifiers';
+import { restrictToCanvas } from './modifiers/restrictToCanvas';
+
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Navigation } from '@/components/Navigation';
 import { ComponentEditor } from '@/components/builder/ComponentEditor';
@@ -43,6 +46,7 @@ export default function EnhancedTemplateBuilder() {
         deleteTemplate,
         startNewTemplate,
         createSampleTemplate,
+        reorderComponent,
         undo,
         redo,
         canUndo,
@@ -66,7 +70,6 @@ export default function EnhancedTemplateBuilder() {
         isResizing,
         dragGuides,
         canvasRef,
-        handleComponentMouseDown,
         handleResizeMouseDown,
         handleCanvasMouseMove,
         handleCanvasMouseUp,
@@ -143,22 +146,46 @@ export default function EnhancedTemplateBuilder() {
     // Handle drag end
     const handleDragEnd = useCallback((event: DragEndEvent) => {
         const { active, over } = event;
+        setActiveComponent(null);
 
-        if (!over) {
-            setActiveComponent(null);
+        if (!over) return;
+        if (active.id === over.id) return;
+
+        const activeComp = components.find(c => c.id === active.id);
+        const overComp = components.find(c => c.id === over.id);
+
+        if (!activeComp || !overComp) return;
+
+        // Define container types
+        const containerTypes = ['Section', 'Row', 'Column', 'Card'];
+        const isOverAContainer = containerTypes.includes(overComp.type);
+
+        // Special handling for Spacer and Divider: they can be dropped into any container type
+        if (['Spacer', 'Divider'].includes(activeComp.type) && isOverAContainer) {
+            setComponentParent(active.id as string, over.id as string);
             return;
         }
 
-        // Handle nesting into containers
-        if (over.id !== active.id && typeof active.id === 'string') {
-            const overComponent = components.find(c => c.id === over.id);
-            if (overComponent && ['Section', 'Card', 'Row', 'Column'].includes(overComponent.type)) {
-                setComponentParent(active.id, over.id as string);
-            }
+        // 1. If dropping over a container, nest it
+        if (['Section', 'Row', 'Column'].includes(overComp.type)) {
+            // Avoid self-nesting or invalid nesting if needed
+            setComponentParent(active.id as string, over.id as string);
+            return;
         }
 
-        setActiveComponent(null);
-    }, [components, setComponentParent]);
+        // 2. If dropping over a non-container (e.g. Text, Button), nest into its parent (Reordering/Sibling)
+        if (overComp.parentId) {
+            // Check if we are reordering in the same parent
+            if (activeComp.parentId === overComp.parentId) {
+                reorderComponent(active.id as string, over.id as string);
+            } else {
+                // Moving from elsewhere into this parent
+                setComponentParent(active.id as string, overComp.parentId);
+            }
+            return;
+        }
+
+    }, [components, setComponentParent, reorderComponent]);
 
     // Handle preview mode change
     const handlePreviewModeChange = useCallback((mode: PreviewMode) => {
@@ -179,7 +206,8 @@ export default function EnhancedTemplateBuilder() {
     return (
         <DndContext
             sensors={sensors}
-            collisionDetection={closestCorners}
+            modifiers={[restrictToWindowEdges, restrictToCanvas]}
+            collisionDetection={pointerWithin}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
@@ -369,9 +397,9 @@ export default function EnhancedTemplateBuilder() {
                                 inlineEditing={inlineEditing}
                                 onSelectComponent={setSelectedComponent}
                                 onDeleteComponent={deleteComponent}
+                                onDuplicateComponent={duplicateComponent}
                                 onUpdateComponent={updateComponent}
                                 onAddComponent={addComponent}
-                                onComponentMouseDown={handleComponentMouseDown}
                                 onResizeMouseDown={handleResizeMouseDown}
                                 onCanvasMouseMove={handleCanvasMouseMove}
                                 onCanvasMouseUp={handleCanvasMouseUp}

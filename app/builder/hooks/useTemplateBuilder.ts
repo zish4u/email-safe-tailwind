@@ -78,51 +78,7 @@ const DEFAULT_CONFIGS: Partial<Record<ComponentType, Partial<TemplateComponent>>
         size: DEFAULT_COMPONENT_SIZES.Image,
         constraints: { aspectRatio: 1.33, lockAspectRatio: true }
     },
-    Header: {
-        props: {
-            title: 'Email Header',
-            subtitle: 'Welcome to our newsletter',
-            logo: 'https://via.placeholder.com/120x40/3b82f6/ffffff?text=LOGO'
-        },
-        size: DEFAULT_COMPONENT_SIZES.Header,
-        style: {
-            backgroundColor: '#1e293b',
-            textColor: '#ffffff',
-            padding: '24px',
-            textAlign: 'center',
-            border: '2px solid #334155',
-        }
-    },
-    Footer: {
-        props: {
-            company: 'Your Company',
-            address: '123 Main St, City, Country',
-            unsubscribeLink: 'https://example.com/unsubscribe'
-        },
-        size: DEFAULT_COMPONENT_SIZES.Footer,
-        style: {
-            backgroundColor: '#1e293b',
-            textColor: '#94a3b8',
-            padding: '24px',
-            fontSize: '12px',
-            textAlign: 'center',
-            border: '2px solid #334155',
-        }
-    },
-    Card: {
-        props: { children: 'Card content' },
-        size: DEFAULT_COMPONENT_SIZES.Card,
-        style: {
-            backgroundColor: '#ffffff',
-            padding: '20px',
-            borderRadius: '12px',
-            border: '1px solid #e5e7eb',
-            textAlign: 'center',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-        }
-    },
+
     Divider: {
         props: { color: '#e5e7eb', thickness: '2px', spacing: '12px' },
         size: DEFAULT_COMPONENT_SIZES.Divider,
@@ -164,7 +120,8 @@ const DEFAULT_CONFIGS: Partial<Record<ComponentType, Partial<TemplateComponent>>
         style: {
             backgroundColor: 'transparent',
             padding: '8px',
-        }
+        },
+        constraints: { resizable: true, movable: true }
     },
     Spacer: {
         props: { height: '20px' },
@@ -194,6 +151,7 @@ export interface UseTemplateBuilderReturn {
     duplicateComponent: (id: string) => void;
     moveComponentUp: (id: string) => void;
     moveComponentDown: (id: string) => void;
+    reorderComponent: (activeId: string, overId: string) => void;
     saveTemplate: () => void;
     loadTemplate: () => void;
     deleteTemplate: () => void;
@@ -419,6 +377,19 @@ export function useTemplateBuilder(): UseTemplateBuilderReturn {
         pushHistory(newComponents);
     }, [components, pushHistory]);
 
+    // Reorder component (for DnD)
+    const reorderComponent = useCallback((activeId: string, overId: string) => {
+        const oldIndex = components.findIndex(c => c.id === activeId);
+        const newIndex = components.findIndex(c => c.id === overId);
+
+        if (oldIndex !== -1 && newIndex !== -1) {
+            const newComponents = [...components];
+            const [movedItem] = newComponents.splice(oldIndex, 1);
+            newComponents.splice(newIndex, 0, movedItem);
+            pushHistory(newComponents);
+        }
+    }, [components, pushHistory]);
+
     // Save template to localStorage
     const saveTemplate = useCallback(() => {
         try {
@@ -463,55 +434,81 @@ export function useTemplateBuilder(): UseTemplateBuilderReturn {
     const createSampleTemplate = useCallback(() => {
         const sampleComponents: TemplateComponent[] = [];
 
-        // Header
-        const header = createComponent('Header', undefined, { x: 16, y: 16 });
-        header.props = {
-            title: 'Welcome to Our Newsletter',
-            subtitle: 'Your weekly dose of awesome content',
-            logo: 'https://via.placeholder.com/120x40/3b82f6/ffffff?text=LOGO'
-        };
-        header.size = { width: 568, height: 100 };
-        sampleComponents.push(header);
+        // 1. Header Section
+        const headerSection = createComponent('Section', undefined, { x: 0, y: 0 });
+        headerSection.style = { ...headerSection.style, backgroundColor: '#1e293b', padding: '24px' };
+        sampleComponents.push(headerSection);
 
-        // Main section
-        const mainSection = createComponent('Section', undefined, { x: 16, y: 130 });
-        mainSection.size = { width: 568, height: 200 };
-        mainSection.style = { ...mainSection.style, backgroundColor: '#ffffff' };
+        // Row inside Header
+        const headerRow = createComponent('Row', headerSection.id);
+        sampleComponents.push(headerRow);
+
+        // Column for Logo/Title
+        const headerCol = createComponent('Column', headerRow.id);
+        headerCol.style = { ...headerCol.style, alignItems: 'center' };
+        sampleComponents.push(headerCol);
+
+        // Logo Text
+        const logoText = createComponent('Text', headerCol.id);
+        logoText.props = { children: '📧 MAIL BUILDER', variant: 'h2' };
+        logoText.style = { ...logoText.style, textColor: '#ffffff', fontSize: '24px', fontWeight: 'bold', textAlign: 'center' };
+        sampleComponents.push(logoText);
+
+        // Subtitle
+        const subtitle = createComponent('Text', headerCol.id);
+        subtitle.props = { children: 'Professional Email Templates' };
+        subtitle.style = { ...subtitle.style, textColor: '#94a3b8', fontSize: '14px', textAlign: 'center' };
+        sampleComponents.push(subtitle);
+
+        // 2. Main Content Section
+        const mainSection = createComponent('Section', undefined, { x: 0, y: 0 });
+        mainSection.style = { ...mainSection.style, backgroundColor: '#ffffff', padding: '32px' };
         sampleComponents.push(mainSection);
 
-        // Text content
-        const text = createComponent('Text', undefined, { x: 16, y: 350 });
-        text.props = {
-            children: 'Thank you for subscribing to our newsletter! We\'re excited to share the latest updates with you.'
-        };
-        text.size = { width: 568, height: 60 };
-        sampleComponents.push(text);
+        // Main Row
+        const mainRow = createComponent('Row', mainSection.id);
+        sampleComponents.push(mainRow);
 
-        // CTA Button
-        const button = createComponent('Button', undefined, { x: 200, y: 430 });
-        button.props = { children: 'Learn More', href: '#' };
-        button.size = { width: 160, height: 48 };
+        // Main Column
+        const mainCol = createComponent('Column', mainRow.id);
+        sampleComponents.push(mainCol);
+
+        // Welcome Text
+        const welcomeText = createComponent('Text', mainCol.id);
+        welcomeText.props = { children: 'Welcome to the new Drag & Drop Builder!' };
+        welcomeText.style = { ...welcomeText.style, fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' };
+        sampleComponents.push(welcomeText);
+
+        // Body Text
+        const bodyText = createComponent('Text', mainCol.id);
+        bodyText.props = { children: 'You can now nest components! Try dragging a Row into this Section, then adding Columns and Buttons.' };
+        bodyText.style = { ...bodyText.style, lineHeight: '1.6', marginBottom: '24px' };
+        sampleComponents.push(bodyText);
+
+        // Button
+        const button = createComponent('Button', mainCol.id);
+        button.props = { children: 'Get Started', href: '#' };
+        button.style = { ...button.style, backgroundColor: '#3b82f6', width: 'auto' };
         sampleComponents.push(button);
 
-        // Divider
-        const divider = createComponent('Divider', undefined, { x: 16, y: 500 });
-        divider.size = { width: 568, height: 2 };
-        sampleComponents.push(divider);
+        // 3. Footer Section
+        const footerSection = createComponent('Section', undefined, { x: 0, y: 0 });
+        footerSection.style = { ...footerSection.style, backgroundColor: '#f1f5f9', padding: '24px' };
+        sampleComponents.push(footerSection);
 
-        // Social links
-        const social = createComponent('SocialLinks', undefined, { x: 170, y: 520 });
-        social.size = { width: 260, height: 40 };
-        sampleComponents.push(social);
+        // Footer Row
+        const footerRow = createComponent('Row', footerSection.id);
+        sampleComponents.push(footerRow);
 
-        // Footer
-        const footer = createComponent('Footer', undefined, { x: 16, y: 580 });
-        footer.props = {
-            company: 'Your Company Inc.',
-            address: '123 Business Ave, Suite 100, San Francisco, CA 94105',
-            unsubscribeLink: '#unsubscribe'
-        };
-        footer.size = { width: 568, height: 100 };
-        sampleComponents.push(footer);
+        // Footer Column
+        const footerCol = createComponent('Column', footerRow.id);
+        sampleComponents.push(footerCol);
+
+        // Footer Text
+        const footerText = createComponent('Text', footerCol.id);
+        footerText.props = { children: '© 2024 Email Builder Inc. All rights reserved.' };
+        footerText.style = { ...footerText.style, fontSize: '12px', textColor: '#64748b', textAlign: 'center' };
+        sampleComponents.push(footerText);
 
         resetHistory(sampleComponents);
         setSelectedComponent(null);
@@ -529,6 +526,7 @@ export function useTemplateBuilder(): UseTemplateBuilderReturn {
         duplicateComponent,
         moveComponentUp,
         moveComponentDown,
+        reorderComponent,
         saveTemplate,
         loadTemplate,
         deleteTemplate,

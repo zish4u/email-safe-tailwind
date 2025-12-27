@@ -9,7 +9,7 @@ import { TemplateComponent, getDefaultComponentSize, CANVAS_SIZES } from '../typ
 const DEFAULT_CANVAS_WIDTH = CANVAS_SIZES.desktop.width;
 
 // Build component tree from flat array
-function buildComponentTree(flat: TemplateComponent[]): TemplateComponent[] {
+export function buildComponentTree(flat: TemplateComponent[]): TemplateComponent[] {
     const map = new Map<string, TemplateComponent>();
     flat.forEach(c => map.set(c.id, { ...c, children: [] }));
     map.forEach(node => {
@@ -146,17 +146,103 @@ function getSocialIconUrl(platform: string, url: string): string {
 }
 
 // Render a single component to HTML
-function renderNode(component: TemplateComponent): string {
+function renderNode(component: TemplateComponent, mode: 'email' | 'web' = 'email'): string {
     const style = component.style || {};
     const size = component.size || getDefaultComponentSize(component.type);
-    const childrenHtml = (component.children || []).map(renderNode).join('');
+    const childrenHtml = (component.children || []).map(c => renderNode(c, mode)).join('');
 
+    if (mode === 'web') {
+        // Web Mode (div-based) rendering for Preview/Canvas
+        switch (component.type) {
+            case 'Section':
+                return `
+                    <div style="width:100%; background-color:${style.backgroundColor || '#ffffff'}; padding:${css((style.padding as any)?.all ? style.padding : '16px', '16px')}; border-radius:${css(style.borderRadius, '0')};">
+                        ${childrenHtml || esc(component.props.children || '')}
+                    </div>
+                `;
+
+            case 'Row': {
+                const gap = css(style.gap, '8px');
+                return `
+                    <div style="display:flex; width:100%; gap:${gap};">
+                        ${childrenHtml}
+                    </div>
+                `;
+            }
+
+            case 'Column':
+                return `
+                    <div style="flex:1; width:100%;">
+                        ${childrenHtml || esc(component.props.children || '')}
+                    </div>
+                `;
+
+            // Card case removed to align with types
+
+            case 'Text': {
+                const align = getComponentAlignment(component);
+                return `
+                    <div style="width:100%; text-align:${align}; padding:${css(style.padding, '0')};">
+                        <div style="color:${style.textColor || '#111827'}; font-size:${style.fontSize || '14px'}; font-family:${style.fontFamily || 'Arial, Helvetica, sans-serif'}; font-weight:${style.fontWeight || 'normal'}; text-align:${align}; line-height:${style.lineHeight || '1.5'};">
+                            ${component.props.children || ''}
+                        </div>
+                    </div>
+                 `;
+            }
+
+            case 'Button': {
+                const align = getAlignmentFromPosition(component);
+                const href = String(component.props?.href || '#');
+                const label = component.props?.children || 'Click Here';
+                const bg = style.backgroundColor || '#3b82f6';
+                const fg = style.textColor || '#ffffff';
+                const pad = css(style.padding, '12px 24px');
+                const radius = css(style.borderRadius, '6px');
+
+                return `
+                    <div style="width:100%; text-align:${align}; padding:${css(style.margin, '8px 0')};">
+                        <a href="${href}" target="_blank" style="display:inline-block; background-color:${bg}; color:${fg}; padding:${pad}; text-decoration:none; font-family:${style.fontFamily || 'Arial, Helvetica, sans-serif'}; font-size:${style.fontSize || '14px'}; font-weight:${style.fontWeight || '600'}; border-radius:${radius};">
+                            ${label}
+                        </a>
+                    </div>
+                `;
+            }
+
+            case 'Image': {
+                const src = String(component.props?.src || '');
+                const alt = esc(component.props?.alt || '');
+                const width = component.size?.width ? `${component.size.width}px` : '100%';
+                return `
+                    <div style="width:100%; text-align:${style.textAlign || 'center'}; padding:${css(style.margin, '8px 0')};">
+                         <img src="${src}" alt="${alt}" style="max-width:100%; width:${width}; height:auto; display:inline-block; border-radius:${css(style.borderRadius, '0')};" />
+                    </div>
+                `;
+            }
+
+            case 'Divider':
+                return `
+                    <div style="padding:${css(style.margin, '16px 0')}; width:100%;">
+                        <div style="height:${component.props?.thickness || '1px'}; background-color:${style.backgroundColor || '#e5e7eb'};"></div>
+                    </div>
+                `;
+
+            case 'Spacer':
+                return `<div style="height:${component.props?.height || 20}px;"></div>`;
+
+            // For other components, fall back to default or simple divs
+            default:
+                // Fallthrough to shared rendering logic or specific handlers below
+                break;
+        }
+    }
+
+    // Email Mode (Table-based) - Or Fallback for Web Mode specific shared components
     switch (component.type) {
         case 'Section':
             return `
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
                     <tr>
-                        <td style="background-color:${style.backgroundColor || '#ffffff'};padding:${css(style.padding, '16px')};border-radius:${css(style.borderRadius, '0')};">
+                        <td style="background-color:${style.backgroundColor || '#ffffff'};padding:${css((style.padding as any)?.all ? style.padding : '16px', '16px')};border-radius:${css(style.borderRadius, '0')};">
                             ${childrenHtml || esc(component.props.children || '')}
                         </td>
                     </tr>
@@ -171,7 +257,7 @@ function renderNode(component: TemplateComponent): string {
                 const rightPad = idx === cols.length - 1 ? '0' : gap;
                 return `
                     <td valign="top" width="${colWidth}" style="padding-right:${rightPad};">
-                        ${renderNode(child)}
+                        ${renderNode(child, mode)}
                     </td>
                 `;
             }).join('');
@@ -191,19 +277,6 @@ function renderNode(component: TemplateComponent): string {
                 </table>
             `;
 
-        case 'Card': {
-            const bg = style.backgroundColor || '#ffffff';
-            return `
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;border-spacing:0;background-color:${bg};border:${style.border || '1px solid #e5e7eb'};border-radius:${css(style.borderRadius, '8px')};">
-                    <tr>
-                        <td style="padding:${css(style.padding, '16px')};text-align:${textAlign(style)};">
-                            ${childrenHtml || esc(component.props.children || '')}
-                        </td>
-                    </tr>
-                </table>
-            `;
-        }
-
         case 'Text': {
             const align = getComponentAlignment(component);
             return `
@@ -220,7 +293,7 @@ function renderNode(component: TemplateComponent): string {
         }
 
         case 'Button': {
-            const align = getComponentAlignment(component);
+            const align = getAlignmentFromPosition(component);
             const href = String(component.props?.href || '#');
             const label = component.props?.children || 'Click Here';
             const bg = style.backgroundColor || '#3b82f6';
@@ -265,86 +338,6 @@ function renderNode(component: TemplateComponent): string {
             `;
         }
 
-        case 'SocialLinks': {
-            const links = Array.isArray(component.props?.links) ? component.props.links : [];
-            const align = component.props?.align || style.textAlign || 'center';
-            const tableAlign = align === 'center' ? 'center' : align === 'right' ? 'right' : 'left';
-            const iconSize = component.props?.size === 'lg' ? 32 : component.props?.size === 'sm' ? 20 : 24;
-
-            const linkHtml = links.map((link: { platform?: string; url?: string; icon?: string }, idx: number) => {
-                const platform = String(link?.platform || 'Link');
-                const url = String(link?.url || '#');
-                const icon = link?.icon || getSocialIconUrl(platform, url);
-                const pr = idx === links.length - 1 ? '0' : '8px';
-
-                if (icon) {
-                    return `
-                        <td style="padding-right:${pr};">
-                            <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;text-decoration:none;">
-                                <img src="${icon}" alt="${platform}" width="${iconSize}" height="${iconSize}" style="display:block;border-radius:50%;border:0;outline:none;" />
-                            </a>
-                        </td>
-                    `;
-                }
-
-                return `
-                    <td style="padding-right:${pr};font-family:Arial,sans-serif;font-size:12px;">
-                        <a href="${url}" target="_blank" rel="noopener noreferrer" style="color:${style.textColor || '#2563eb'};text-decoration:none;">
-                            ${platform}
-                        </a>
-                    </td>
-                `;
-            }).join('');
-
-            return `
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="${tableAlign}" style="border-collapse:collapse;">
-                    <tr>${linkHtml}</tr>
-                </table>
-            `;
-        }
-
-        case 'Header': {
-            const title = String(component.props?.title || '');
-            const subtitle = String(component.props?.subtitle || '');
-            const logo = String(component.props?.logo || '');
-            const bg = style.backgroundColor || '#1e293b';
-            const fg = style.textColor || '#ffffff';
-
-            return `
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:${bg};">
-                    <tr>
-                        <td style="padding:${css(style.padding, '24px')};text-align:${textAlign(style)};">
-                            ${logo ? `<div style="margin-bottom:12px;"><img src="${logo}" alt="" style="display:inline-block;max-width:150px;height:auto;border:0;" /></div>` : ''}
-                            ${title ? `<div style="font-size:24px;font-weight:700;color:${fg};font-family:${style.fontFamily || 'Arial, Helvetica, sans-serif'};margin-bottom:4px;">${esc(title)}</div>` : ''}
-                            ${subtitle ? `<div style="font-size:14px;color:${fg};opacity:0.85;font-family:${style.fontFamily || 'Arial, Helvetica, sans-serif'};">${esc(subtitle)}</div>` : ''}
-                        </td>
-                    </tr>
-                </table>
-            `;
-        }
-
-        case 'Footer': {
-            const company = String(component.props?.company || '');
-            const address = String(component.props?.address || '');
-            const unsubscribeLink = String(component.props?.unsubscribeLink || '');
-            const bg = style.backgroundColor || '#1e293b';
-            const fg = style.textColor || '#94a3b8';
-            const year = new Date().getFullYear();
-
-            return `
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:${bg};">
-                    <tr>
-                        <td style="padding:${css(style.padding, '24px')};text-align:${textAlign(style)};font-family:${style.fontFamily || 'Arial, Helvetica, sans-serif'};font-size:${style.fontSize || '12px'};color:${fg};">
-                            ${company ? `<div style="font-weight:600;font-size:14px;margin-bottom:8px;color:${fg};">${esc(company)}</div>` : ''}
-                            ${address ? `<div style="font-size:12px;opacity:0.85;margin-bottom:12px;">${esc(address)}</div>` : ''}
-                            ${unsubscribeLink ? `<div style="font-size:11px;margin-bottom:8px;"><a href="${unsubscribeLink}" style="color:${fg};text-decoration:underline;">Unsubscribe</a> | <a href="${unsubscribeLink}" style="color:${fg};text-decoration:underline;">Manage Preferences</a></div>` : ''}
-                            <div style="font-size:11px;opacity:0.6;padding-top:12px;border-top:1px solid ${fg}30;">&copy; ${year} ${esc(company || 'Company')}. All rights reserved.</div>
-                        </td>
-                    </tr>
-                </table>
-            `;
-        }
-
         case 'Divider': {
             const color = style.backgroundColor || '#e5e7eb';
             const thickness = component.props?.thickness || '1px';
@@ -370,95 +363,11 @@ function renderNode(component: TemplateComponent): string {
             `;
         }
 
-        case 'Logo': {
-            const src = String(component.props?.src || '');
-            const alt = esc(component.props?.alt || 'Logo');
-            const link = component.props?.link;
-            const imgHtml = `<img src="${src}" alt="${alt}" style="display:block;max-width:${size.width}px;height:auto;border:0;" />`;
-
-            return link
-                ? `<a href="${link}" target="_blank" style="display:inline-block;text-decoration:none;">${imgHtml}</a>`
-                : imgHtml;
-        }
-
-        case 'Module': {
-            const backgroundColor = component.props?.backgroundColor || '#ffffff';
-            const padding = component.props?.padding || {};
-            const margin = component.props?.margin || {};
-            const maxWidth = component.props?.maxWidth || 600;
-            const fullWidth = component.props?.fullWidth !== false;
-
-            const paddingValue = `${padding.all || 16}px ${padding.horizontal || 16}px ${padding.all || 16}px ${padding.horizontal || 16}px`;
-            const marginValue = `${margin.all || 0}px auto`;
-            const widthValue = fullWidth ? '100%' : `${maxWidth}px`;
-
-            return `
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
-                    <tr>
-                        <td align="center" style="padding:${marginValue};">
-                            <table role="presentation" width="${widthValue}" cellpadding="0" cellspacing="0" border="0" style="width:${widthValue};border-collapse:collapse;">
-                                <tr>
-                                    <td style="background-color:${backgroundColor};padding:${paddingValue};border-radius:4px;">
-                                        ${childrenHtml}
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                </table>
-            `;
-        }
-
-        case 'Grid': {
-            const columns = component.props?.columns || 2;
-            const columnSpacing = component.props?.columnSpacing || 16;
-            const backgroundColor = component.props?.backgroundColor || 'transparent';
-            const padding = component.props?.padding || {};
-
-            const paddingValue = `${padding.all || 0}px ${padding.horizontal || 0}px ${padding.all || 0}px ${padding.horizontal || 0}px`;
-            const colWidth = `${Math.floor(100 / columns)}%`;
-            const spacingStyle = `padding-left:${columnSpacing}px;`;
-
-            return `
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
-                    <tr>
-                        <td style="background-color:${backgroundColor};padding:${paddingValue};">
-                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
-                                <tr>
-                                    ${Array.from({ length: columns }, (_, i) => `
-                                        <td valign="top" width="${colWidth}" style="${i > 0 ? spacingStyle : ''}width:${colWidth};">
-                                            ${childrenHtml}
-                                        </td>
-                                    `).join('')}
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                </table>
-            `;
-        }
-
-        case 'GridItem': {
-            const backgroundColor = component.props?.backgroundColor || 'transparent';
-            const padding = component.props?.padding || {};
-            const paddingValue = `${padding.all || 8}px ${padding.horizontal || 8}px ${padding.all || 8}px ${padding.horizontal || 8}px`;
-
-            return `
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
-                    <tr>
-                        <td style="background-color:${backgroundColor};padding:${paddingValue};vertical-align:top;">
-                            ${childrenHtml}
-                        </td>
-                    </tr>
-                </table>
-            `;
-        }
-
         case 'Group': {
             const direction = component.props?.direction || 'vertical';
             const spacing = component.props?.spacing || 10;
             const backgroundColor = component.props?.backgroundColor || 'transparent';
-            const padding = component.props?.padding || {};
+            const padding: any = component.props?.padding || {};
             const paddingValue = `${padding.all || 0}px ${padding.horizontal || 0}px ${padding.all || 0}px ${padding.horizontal || 0}px`;
 
             if (direction === 'horizontal') {
@@ -498,39 +407,20 @@ function renderNode(component: TemplateComponent): string {
     }
 }
 
-// Render root-level components with side-by-side layout support
-function renderRootComponents(rootComponents: TemplateComponent[]): string {
+// Render root-level components (Vertical Stack for Sections)
+function renderRootComponents(rootComponents: TemplateComponent[], mode: 'email' | 'web' = 'email'): string {
     if (rootComponents.length === 0) return '';
 
-    const rows = groupComponentsIntoRows(rootComponents);
-
-    return rows.map(row => {
-        if (row.length === 1) {
-            return renderNode(row[0]);
-        }
-
-        const colWidth = `${Math.floor(100 / row.length)}%`;
-        const colsHtml = row.map((comp, idx) => {
-            const rightPad = idx === row.length - 1 ? '0' : '16px';
-            return `
-                <td valign="top" width="${colWidth}" style="padding-right:${rightPad};">
-                    ${renderNode(comp)}
-                </td>
-            `;
-        }).join('');
-
-        return `
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
-                <tr>${colsHtml}</tr>
-            </table>
-        `;
-    }).join('');
+    // In strict nesting mode, root components are typically Sections which stack vertically.
+    // We simply render them in order.
+    return rootComponents.map(comp => renderNode(comp, mode)).join('');
 }
 
 export interface GenerateHtmlOptions {
     preheaderText?: string;
     backgroundColor?: string;
     contentWidth?: number;
+    mode?: 'email' | 'web';
 }
 
 /**
@@ -544,10 +434,11 @@ export function generateEmailHtml(
         preheaderText = '',
         backgroundColor = '#f3f4f6',
         contentWidth = 600,
+        mode = 'email'
     } = options;
 
     const tree = buildComponentTree(components);
-    const contentHtml = renderRootComponents(tree);
+    const contentHtml = renderRootComponents(tree, mode);
 
     // Preheader text (hidden preview text in email clients)
     const preheaderHtml = preheaderText
@@ -601,14 +492,14 @@ export function generateEmailHtml(
     <div style="background-color:${backgroundColor};">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
             <tr>
-                <td align="center" style="padding:20px 10px;">
+                <td align="center" style="padding:0;">
                     <!--[if mso | IE]>
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="${contentWidth}">
                     <tr>
                     <td>
                     <![endif]-->
                     
-                    <table class="email-container" role="presentation" cellpadding="0" cellspacing="0" border="0" width="${contentWidth}" style="width:100%;max-width:${contentWidth}px;border-collapse:collapse;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+                    <table class="email-container" role="presentation" cellpadding="0" cellspacing="0" border="0" width="${contentWidth}" style="width:100%;max-width:${contentWidth}px;border-collapse:collapse;background-color:#ffffff;margin:0 auto;">
                         <tr>
                             <td style="padding:0;">
                                 ${contentHtml}

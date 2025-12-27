@@ -59,6 +59,9 @@ export interface ComponentStyle {
     display?: string;
     alignItems?: string;
     justifyContent?: string;
+    width?: string;
+    height?: string;
+    flexDirection?: string;
 }
 
 // Component types supported by the builder
@@ -71,7 +74,9 @@ export type ComponentType =
     | 'Image'
     | 'Button'
     | 'Divider'
-    | 'Spacer';
+    | 'Spacer'
+    | 'SocialLinks'
+    | 'Logo';
 
 // Component metadata for UI display
 export interface ComponentDetail {
@@ -88,17 +93,11 @@ export const COMPONENT_DETAILS: Record<ComponentType, ComponentDetail> = {
     Group: { icon: '🔲', description: 'Flexible grid layout' },
     Text: { icon: '📝', description: 'Text content block' },
     Image: { icon: '🖼️', description: 'Image with alt text' },
-    // Card: { icon: '🃏', description: 'Card with content' },
     Divider: { icon: '➖', description: 'Horizontal divider line' },
     Button: { icon: '🔘', description: 'Clickable button' },
-    // SocialLinks: { icon: '🔗', description: 'Social media links' },
-    // Menu: { icon: '🍔', description: 'Navigation menu' },
-    // Logo: { icon: '🏢', description: 'Company logo' },
-    // Header: { icon: '📄', description: 'Email header section' },
-    // Footer: { icon: '📌', description: 'Email footer with unsubscribe' },
+    SocialLinks: { icon: '🔗', description: 'Social media links' },
+    Logo: { icon: '🏢', description: 'Company logo' },
     Spacer: { icon: '↕️', description: 'Vertical space' },
-    // Wrapper: { icon: '📎', description: 'Content wrapper' },
-    // Conditional: { icon: '🎯', description: 'Conditional content' },
 };
 
 // Component categories for the library sidebar
@@ -140,6 +139,8 @@ export const DEFAULT_COMPONENT_SIZES: Record<ComponentType, { width: number; hei
     Image: { width: 200, height: 150 },
     Divider: { width: 400, height: 2 },
     Spacer: { width: 400, height: 10 },
+    SocialLinks: { width: 300, height: 50 },
+    Logo: { width: 100, height: 50 },
 };
 
 // Canvas sizes for different preview modes
