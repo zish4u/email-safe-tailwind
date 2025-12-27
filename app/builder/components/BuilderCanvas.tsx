@@ -43,7 +43,7 @@ interface BuilderCanvasProps {
     onDeleteComponent: (id: string) => void;
     onDuplicateComponent: (id: string) => void;
     onUpdateComponent: (id: string, updates: Partial<TemplateComponent>) => void;
-    onAddComponent: (type: string, parentId?: string, position?: { x: number; y: number }) => void;
+    onAddComponent: (type: string, parentId?: string, position?: { x: number; y: number }, initialStyles?: Record<string, any>) => void;
     onResizeMouseDown: (e: React.MouseEvent, componentId: string, direction: string) => void;
     onCanvasMouseMove: (e: React.MouseEvent) => void;
     onCanvasMouseUp: () => void;
@@ -134,13 +134,61 @@ export const BuilderCanvas = memo(function BuilderCanvas({
         e.preventDefault();
         e.stopPropagation();
 
+        // 1. SAFE AREA CHECK
+        // Check if the drop target is actually within the canvas paper
+        // We can check if the element elementFromPoint is the canvas-area or a child of it
+        const elementUnderCursor = document.elementFromPoint(e.clientX, e.clientY);
+        const canvasArea = document.getElementById('canvas-area');
+
+        if (!canvasArea || !elementUnderCursor) return;
+
+        // If the element under cursor is not the canvas area and not contained in it, ignore
+        if (elementUnderCursor !== canvasArea && !canvasArea.contains(elementUnderCursor)) {
+            // Drop was outside the safe area (paper)
+            return;
+        }
+
         const componentType = e.dataTransfer.getData('text/plain');
         if (!componentType.startsWith('library-')) return;
 
         const actualType = componentType.replace('library-', '');
 
         // Find the valid parent for this component type at the drop location
-        const targetParentId = findTargetParent(e.clientX, e.clientY, actualType);
+        let targetParentId = findTargetParent(e.clientX, e.clientY, actualType);
+
+        // 2. COLUMN PLACEMENT IMPROVEMENT
+        // If we are dropping a Column or Content into a Column, check if we want to place it NEXT to it (Row parent)
+        if (targetParentId) {
+            const targetElement = document.querySelector(`[data-component-id="${targetParentId}"]`);
+
+            // If we found a parent, and that parent is a Column, and we are dragging a generic element
+            // We might want to see if we are at the edge to "break out" to the Row
+            if (targetElement && targetElement.getAttribute('data-component-type') === 'Column') {
+                const rect = targetElement.getBoundingClientRect();
+                const isRightEdge = (e.clientX - rect.left) > (rect.width * 0.8); // Right 20%
+
+                if (isRightEdge) {
+                    // Try to find the parent of this column (which should be a Row)
+                    // We can't easily look up the tree without the component map efficiently here unless we had a 'parentId' lookup
+                    // But we can check the DOM parent's parent usually
+                    // Let's rely on finding the Row by point if we ignored the column?
+
+                    // Alternative: "findTargetParent" returns the deepest valid. 
+                    // We could manually override if we detect this edge case.
+                    // A safer way: If we are dragging a "Column" type, we likely want to add it to the Row, not nest in a Column.
+                    if (actualType === 'Column') {
+                        // Find the Row ID
+                        // DOM structure: Row -> Wrapper -> Column? Or just Row -> Column
+                        // targetElement is the Column div. Parent should be the Row div (or Sortable wrapper)
+                        // Our DOM: <div id="RowID"> ... <div id="ColID"> 
+                        const rowCandidate = targetElement.closest('[data-component-type="Row"]');
+                        if (rowCandidate) {
+                            targetParentId = (rowCandidate as HTMLElement).getAttribute('data-component-id') || targetParentId;
+                        }
+                    }
+                }
+            }
+        }
 
         // If strict nesting rules fail, we might want to auto-wrap? 
         // For now, let's try to just add it. The undefined parentId means root.
@@ -150,16 +198,48 @@ export const BuilderCanvas = memo(function BuilderCanvas({
         // AUTO-WRAPPING LOGIC (Simple version)
         // If dropped on Root but needs to be in something else
         if (targetParentId === undefined && actualType !== 'Section') {
-            // If we drop a specialized element on the canvas, we could simply not allow it,
-            // or creates a new Section structure.
-            // For now, let's allow adding to root if no parent found, 
-            // but visually it might look broken if we enforce styles.
-            // Let's rely on onAddComponent to handle or just let it float at top if supported.
+            // RELAXED RULE: If we drop a Content item (Button/Text) onto a Section, findTargetParent returns undefined?
+            if (['Button', 'Text', 'Image'].includes(actualType)) {
+                // Check if we dropped on a Section
+                const elementUnderCursor = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement;
+                if (elementUnderCursor) {
+                    const sectionEl = elementUnderCursor.closest('[data-component-type="Section"]');
+                    if (sectionEl) {
+                        // We found a section. If we drop here, use strict logic might fail.
+                        // But we can try to find a Column within it? Or just let it fail.
+                        // Actually, if we return here, we proceed with targetParentId=undefined.
+                        // But if we want to support this, we should find a valid parent.
+                    }
+                }
+            }
+        }
+
+        // Calculate alignment based on drop X position relative to target parent
+        let styles = {};
+        if (targetParentId) {
+            const targetElement = document.querySelector(`[data-component-id="${targetParentId}"]`);
+            if (targetElement) {
+                const rect = targetElement.getBoundingClientRect();
+                const relativeX = e.clientX - rect.left;
+                const percent = relativeX / rect.width;
+
+                let align = 'left';
+                if (percent > 0.33 && percent < 0.66) align = 'center';
+                if (percent >= 0.66) align = 'right';
+
+                // If we are dropping text/button/image, set textAlign
+                if (['Text', 'Button', 'Image'].includes(actualType)) {
+                    styles = { textAlign: align };
+                }
+                // If dragging into a Row/Column (flex container), maybe justifyContent? 
+                // But usually we set the item's alignment if possible or rely on the container.
+                // For simplified email builder, text-align on the item wrapper is often safest.
+            }
         }
 
         // We don't really care about X/Y for flow layout, just order.
         // But we'll pass 0,0 for now.
-        onAddComponent(actualType, targetParentId, { x: 0, y: 0 });
+        onAddComponent(actualType, targetParentId, { x: 0, y: 0 }, styles);
 
     }, [findTargetParent, onAddComponent]);
 
@@ -372,12 +452,34 @@ const CanvasComponent = memo(function CanvasComponent({
         }
     });
 
+    if (component.isVisible === false && !inlineEditing) {
+        // Maybe show a placeholder or just hide it? 
+        // If we hide it completely, we can't select it easily on canvas.
+        // "User can show and hide". Usually hidden layers are not rendered on canvas, only visible in tree.
+        // But for editing purposes, maybe semitransparent? 
+        // Let's hide it from the render flow entirely effectively.
+        // But we still need the hook calls above to not break rules of hooks if we returned early.
+        // Wait, hooks are called.
+
+        // If I return null here, it won't be in the DOM.
+        // But SortableContext expects the id to exist if it is in the list?
+        // If it's not rendered, drag and drop might get confused if we don't filter it out of children list too.
+        // Actually, let's just use display: none or render nothing.
+        // If we return null, we might break the ref for dnd-kit if it was active.
+        // Let's return null but keep in mind we might need to filter children in the parent component logic if this causes issues.
+        // However, standard "Hide" feature usually implies removing from visual tree.
+
+        return null;
+    }
+
     const style = component.style || {};
 
     // Calculate final style
     const finalStyle: any = {
         ...style,
-        position: 'relative', // Flow layout
+        position: style.position || 'relative', // Allow user to override position
+        left: style.left, // Allow manual X positioning
+        top: style.top,   // Allow manual Y positioning
         width: component.size?.width ? `${component.size.width}px` : style.width || '100%',
         height: component.size?.height ? `${component.size.height}px` : style.height || 'auto',
         minHeight: isContainer ? '50px' : 'auto', // Ensure containers are droppable
@@ -409,6 +511,7 @@ const CanvasComponent = memo(function CanvasComponent({
             ref={setNodeRef}
             style={finalStyle}
             id={component.id}
+            data-component-id={component.id}
             data-component-type={component.type}
             className={`group relative ${isSelected ? 'z-40' : 'z-auto'} ${isContainer ? 'min-h-[50px]' : ''} `}
             onClick={(e) => {

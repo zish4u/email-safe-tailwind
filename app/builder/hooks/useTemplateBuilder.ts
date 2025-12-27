@@ -26,10 +26,11 @@ const DEFAULT_CONFIGS: Partial<Record<ComponentType, Partial<TemplateComponent>>
         style: {
             backgroundColor: '#3b82f6',
             textColor: '#ffffff',
-            padding: '12px 24px',
             borderRadius: '6px',
             fontSize: '14px',
             fontWeight: '600',
+            textAlign: 'center',
+            display: 'flex',
             textAlign: 'center',
             display: 'flex',
             alignItems: 'center',
@@ -49,14 +50,6 @@ const DEFAULT_CONFIGS: Partial<Record<ComponentType, Partial<TemplateComponent>>
             textColor: '#1e293b',
             fontSize: '16px',
             lineHeight: '1.6',
-            padding: '12px',
-            backgroundColor: '#f8fafc',
-            textAlign: 'left',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            borderRadius: '6px',
-            border: '1px solid #e2e8f0'
         }
     },
     Section: {
@@ -64,7 +57,7 @@ const DEFAULT_CONFIGS: Partial<Record<ComponentType, Partial<TemplateComponent>>
         size: DEFAULT_COMPONENT_SIZES.Section,
         style: {
             backgroundColor: '#f0f9ff',
-            padding: '32px',
+            padding: '0px',
             borderRadius: '12px',
             border: '2px solid #bae6fd',
         }
@@ -110,8 +103,8 @@ const DEFAULT_CONFIGS: Partial<Record<ComponentType, Partial<TemplateComponent>>
         size: DEFAULT_COMPONENT_SIZES.Row,
         style: {
             backgroundColor: 'transparent',
-            padding: '8px',
-            gap: '16px',
+            padding: '0px',
+            gap: '0px',
         }
     },
     Column: {
@@ -119,7 +112,7 @@ const DEFAULT_CONFIGS: Partial<Record<ComponentType, Partial<TemplateComponent>>
         size: DEFAULT_COMPONENT_SIZES.Column,
         style: {
             backgroundColor: 'transparent',
-            padding: '8px',
+            padding: '0px',
         },
         constraints: { resizable: true, movable: true }
     },
@@ -137,13 +130,23 @@ const DEFAULT_CONFIGS: Partial<Record<ComponentType, Partial<TemplateComponent>>
         },
         size: DEFAULT_COMPONENT_SIZES.Logo,
     },
+    Group: {
+        props: {},
+        size: DEFAULT_COMPONENT_SIZES.Group,
+        style: {
+            backgroundColor: 'transparent',
+            padding: '0px',
+            border: '1px dashed #cbd5e1',
+        },
+        constraints: { resizable: true, movable: true }
+    }
 };
 
 export interface UseTemplateBuilderReturn {
     components: TemplateComponent[];
     selectedComponent: string | null;
     setSelectedComponent: (id: string | null) => void;
-    addComponent: (type: string, parentId?: string, position?: { x: number; y: number }) => TemplateComponent;
+    addComponent: (type: string, parentId?: string, position?: { x: number; y: number }, initialStyles?: Record<string, any>) => TemplateComponent;
     updateComponent: (id: string, updates: Partial<TemplateComponent>) => void;
     deleteComponent: (id: string) => void;
     updateComponentPosition: (id: string, x: number, y: number, width?: number, height?: number) => void;
@@ -199,7 +202,8 @@ export function useTemplateBuilder(): UseTemplateBuilderReturn {
     const createComponent = useCallback((
         componentType: string,
         parentId?: string,
-        position?: { x: number; y: number }
+        position?: { x: number; y: number },
+        initialStyles?: Record<string, any>
     ): TemplateComponent => {
         const nestLevel = parentId
             ? (components.find(c => c.id === parentId)?.nestLevel || 0) + 1
@@ -224,13 +228,14 @@ export function useTemplateBuilder(): UseTemplateBuilderReturn {
                 fontSize: '14px',
                 fontFamily: 'Arial, sans-serif',
                 fontWeight: 'normal',
-                padding: '8px',
-                margin: '0',
+                padding: '0px',
+                margin: '0px',
                 border: '1px solid #e5e7eb',
                 borderRadius: '4px',
                 opacity: 1,
                 zIndex: nestLevel,
                 ...config.style,
+                ...initialStyles,
             },
             parentId,
             nestLevel,
@@ -242,9 +247,10 @@ export function useTemplateBuilder(): UseTemplateBuilderReturn {
     const addComponent = useCallback((
         type: string,
         parentId?: string,
-        position?: { x: number; y: number }
+        position?: { x: number; y: number },
+        initialStyles?: Record<string, any>
     ): TemplateComponent => {
-        const newComponent = createComponent(type, parentId, position);
+        const newComponent = createComponent(type, parentId, position, initialStyles);
         const newComponents = [...components, newComponent];
         pushHistory(newComponents);
         setSelectedComponent(newComponent.id);

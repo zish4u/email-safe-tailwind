@@ -1,9 +1,14 @@
 "use client";
 import React, { memo } from 'react';
-import { ComponentType, COMPONENT_DETAILS, COMPONENT_CATEGORIES } from '../types';
+import { LayersPanel } from './LayersPanel';
+import { TemplateComponent, ComponentType, COMPONENT_DETAILS, COMPONENT_CATEGORIES } from '../types';
 
 interface ComponentLibraryProps {
     onDragStart: (componentType: string) => void;
+    components?: TemplateComponent[];
+    selectedId?: string | null;
+    onSelect?: (id: string) => void;
+    onToggleVisibility?: (id: string) => void;
 }
 
 /**
@@ -11,48 +16,78 @@ interface ComponentLibraryProps {
  * Displays categorized draggable components
  */
 export const ComponentLibrary = memo(function ComponentLibrary({
-    onDragStart
+    onDragStart,
+    components = [],
+    selectedId = null,
+    onSelect = () => { },
+    onToggleVisibility = () => { }
 }: ComponentLibraryProps) {
-    return (
-        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-4 h-full">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
-                <span className="text-xl">📚</span>
-                <span>Components</span>
-            </h2>
+    const [activeTab, setActiveTab] = React.useState<'components' | 'layers'>('components');
 
-            <div className="space-y-5">
-                {Object.entries(COMPONENT_CATEGORIES).map(([category, items]) => (
-                    <div key={category}>
-                        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">
-                            {category}
-                        </h3>
-                        <div className="grid grid-cols-2 gap-2">
-                            {items.map((componentType) => {
-                                const details = COMPONENT_DETAILS[componentType as ComponentType];
-                                return (
-                                    <ComponentItem
-                                        key={componentType}
-                                        type={componentType}
-                                        icon={details?.icon || '📦'}
-                                        description={details?.description || 'Component'}
-                                        onDragStart={onDragStart}
-                                    />
-                                );
-                            })}
-                        </div>
-                    </div>
-                ))}
+    return (
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 h-full flex flex-col overflow-hidden">
+            {/* Tabs */}
+            <div className="flex border-b border-gray-700/50">
+                <button
+                    onClick={() => setActiveTab('components')}
+                    className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'components' ? 'text-blue-400 border-b-2 border-blue-500 bg-gray-800/50' : 'text-gray-400 hover:text-gray-200'}`}
+                >
+                    Components
+                </button>
+                <button
+                    onClick={() => setActiveTab('layers')}
+                    className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'layers' ? 'text-blue-400 border-b-2 border-blue-500 bg-gray-800/50' : 'text-gray-400 hover:text-gray-200'}`}
+                >
+                    Layers
+                </button>
             </div>
 
-            {/* Quick Tips */}
-            <div className="mt-6 p-3 bg-gray-900/50 rounded-lg border border-gray-700/50">
-                <h4 className="text-xs font-semibold text-gray-400 mb-2">💡 Tips</h4>
-                <ul className="text-xs text-gray-500 space-y-1">
-                    <li>• Drag components to canvas</li>
-                    <li>• Double-click text to edit</li>
-                    <li>• Use handles to resize</li>
-                    <li>• Ctrl+Z to undo</li>
-                </ul>
+            <div className="flex-1 overflow-auto p-4 custom-scrollbar">
+                {activeTab === 'components' ? (
+                    <>
+                        <div className="space-y-5">
+                            {Object.entries(COMPONENT_CATEGORIES).map(([category, items]) => (
+                                <div key={category}>
+                                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">
+                                        {category}
+                                    </h3>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {items.map((componentType) => {
+                                            const details = COMPONENT_DETAILS[componentType as ComponentType];
+                                            return (
+                                                <ComponentItem
+                                                    key={componentType}
+                                                    type={componentType}
+                                                    icon={details?.icon || '📦'}
+                                                    description={details?.description || 'Component'}
+                                                    onDragStart={onDragStart}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Quick Tips */}
+                        <div className="mt-6 p-3 bg-gray-900/50 rounded-lg border border-gray-700/50">
+                            <h4 className="text-xs font-semibold text-gray-400 mb-2">💡 Tips</h4>
+                            <ul className="text-xs text-gray-500 space-y-1">
+                                <li>• Drag components to canvas</li>
+                                <li>• Double-click text to edit</li>
+                                <li>• Use handles to resize</li>
+                                <li>• Ctrl+Z to undo</li>
+                            </ul>
+                        </div>
+                    </>
+                ) : (
+                    <LayersPanel
+                        components={components}
+                        selectedId={selectedId}
+                        onSelect={onSelect}
+                        onToggleVisibility={onToggleVisibility}
+                    />
+                )}
             </div>
         </div>
     );

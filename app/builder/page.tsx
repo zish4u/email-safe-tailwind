@@ -157,10 +157,35 @@ export default function EnhancedTemplateBuilder() {
         if (!activeComp || !overComp) return;
 
         // Define container types
-        const containerTypes = ['Section', 'Row', 'Column', 'Card'];
+        const containerTypes = ['Section', 'Row', 'Column', 'Card', 'Group'];
         const isOverAContainer = containerTypes.includes(overComp.type);
 
-        // Special handling for Spacer and Divider: they can be dropped into any container type
+        // 3. APPLY ALIGNMENT (New) - Moved up to run before same-id check
+        if (['Text', 'Button', 'Image'].includes(activeComp.type)) {
+            let containerId = isOverAContainer ? over.id : overComp.parentId;
+            if (containerId) {
+                const containerEl = document.querySelector(`[data-component-id="${containerId}"]`);
+                if (containerEl) {
+                    const rect = containerEl.getBoundingClientRect();
+                    const mouseEvent = event.activatorEvent as MouseEvent;
+                    if (mouseEvent && mouseEvent.clientX) {
+                        const relativeX = mouseEvent.clientX - rect.left;
+                        const percent = relativeX / rect.width;
+                        let align = 'left';
+                        if (percent > 0.33 && percent < 0.66) align = 'center';
+                        if (percent >= 0.66) align = 'right';
+
+                        if (activeComp.style?.textAlign !== align) {
+                            updateComponent(active.id as string, {
+                                style: { ...activeComp.style, textAlign: align as any }
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        if (active.id === over.id) return;
         if (['Spacer', 'Divider'].includes(activeComp.type) && isOverAContainer) {
             setComponentParent(active.id as string, over.id as string);
             return;
@@ -182,10 +207,43 @@ export default function EnhancedTemplateBuilder() {
                 // Moving from elsewhere into this parent
                 setComponentParent(active.id as string, overComp.parentId);
             }
-            return;
         }
 
-    }, [components, setComponentParent, reorderComponent]);
+        // 3. APPLY ALIGNMENT (New)
+        // Must run before returning for same-id or reordering
+        if (['Text', 'Button', 'Image'].includes(activeComp.type)) {
+            // We need to find the container element to calculate relative position
+            // If over is container, use it. If sibling, use its parent.
+            let containerId = isOverAContainer ? over.id : overComp.parentId;
+
+            if (containerId) {
+                const containerEl = document.querySelector(`[data-component-id="${containerId}"]`);
+                if (containerEl) {
+                    const rect = containerEl.getBoundingClientRect();
+                    const mouseEvent = event.activatorEvent as MouseEvent;
+                    if (mouseEvent && mouseEvent.clientX) {
+                        const relativeX = mouseEvent.clientX - rect.left;
+                        const percent = relativeX / rect.width;
+
+                        let align = 'left';
+                        if (percent > 0.33 && percent < 0.66) align = 'center';
+                        if (percent >= 0.66) align = 'right';
+
+                        // Update component style if changed
+                        if (activeComp.style?.textAlign !== align) {
+                            updateComponent(active.id as string, {
+                                style: {
+                                    ...activeComp.style,
+                                    textAlign: align as any
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+    }, [components, setComponentParent, reorderComponent, updateComponent]);
 
     // Handle preview mode change
     const handlePreviewModeChange = useCallback((mode: PreviewMode) => {
@@ -377,8 +435,19 @@ export default function EnhancedTemplateBuilder() {
                     {/* Main Layout */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
                         {/* Component Library */}
-                        <div className="lg:col-span-2">
-                            <ComponentLibrary onDragStart={() => { }} />
+                        <div className="lg:col-span-2 h-[calc(100vh-140px)]">
+                            <ComponentLibrary
+                                onDragStart={() => { }}
+                                components={components}
+                                selectedId={selectedComponent}
+                                onSelect={setSelectedComponent}
+                                onToggleVisibility={(id) => {
+                                    const comp = components.find(c => c.id === id);
+                                    if (comp) {
+                                        updateComponent(id, { isVisible: comp.isVisible === false ? true : false });
+                                    }
+                                }}
+                            />
                         </div>
 
                         {/* Canvas */}

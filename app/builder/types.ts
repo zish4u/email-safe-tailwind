@@ -34,6 +34,7 @@ export interface TemplateComponent {
         resizable?: boolean;
         movable?: boolean;
     };
+    isVisible?: boolean;
 }
 
 export interface ComponentStyle {
@@ -62,6 +63,11 @@ export interface ComponentStyle {
     width?: string;
     height?: string;
     flexDirection?: string;
+    position?: 'relative' | 'absolute' | 'static' | 'fixed';
+    left?: string | number;
+    top?: string | number;
+    right?: string | number;
+    bottom?: string | number;
 }
 
 // Component types supported by the builder
