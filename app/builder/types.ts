@@ -149,12 +149,82 @@ export const DEFAULT_COMPONENT_SIZES: Record<ComponentType, { width: number; hei
     Logo: { width: 100, height: 50 },
 };
 
-// Canvas sizes for different preview modes
-export type PreviewMode = 'desktop' | 'mobile';
+// Email-safe canvas dimensions with safe area boundaries
+export type PreviewMode = 'desktop' | 'tablet' | 'mobile';
 
+// Standard email client dimensions (safe for Gmail, Outlook, etc.)
+export const EMAIL_CLIENT_DIMENSIONS = {
+    // Desktop email clients (Gmail, Outlook, Apple Mail)
+    desktop: {
+        maxWidth: 600,  // Safe maximum width for most email clients
+        minWidth: 320,  // Minimum readable width
+        safeWidth: 580, // Optimal safe width with padding
+        padding: 10,    // Safe area padding on each side
+    },
+    // Tablet email clients
+    tablet: {
+        maxWidth: 600,  // Same as desktop for consistency
+        minWidth: 320,
+        safeWidth: 560,
+        padding: 20,
+    },
+    // Mobile email clients
+    mobile: {
+        maxWidth: 414,  // iPhone Plus width
+        minWidth: 320,  // iPhone SE width
+        safeWidth: 374, // Safe width with padding
+        padding: 20,
+    },
+};
+
+// Canvas display sizes (for the builder UI)
 export const CANVAS_SIZES: Record<PreviewMode, { width: number; height: number }> = {
-    desktop: { width: 600, height: 800 }, // Standard email width for desktop
-    mobile: { width: 375, height: 667 }, // Standard mobile dimensions
+    desktop: { width: 640, height: 800 },  // Canvas with visible safe area
+    tablet: { width: 640, height: 800 },   // Same canvas size, different safe area
+    mobile: { width: 454, height: 800 },   // Smaller canvas for mobile
+};
+
+// Safe area boundaries for content placement
+export const SAFE_AREA_BOUNDARIES: Record<PreviewMode, {
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+    width: number;
+    height: number;
+}> = {
+    desktop: {
+        left: 30,
+        right: 30,
+        top: 20,
+        bottom: 20,
+        width: 580,
+        height: 760,
+    },
+    tablet: {
+        left: 40,
+        right: 40,
+        top: 20,
+        bottom: 20,
+        width: 560,
+        height: 760,
+    },
+    mobile: {
+        left: 40,
+        right: 40,
+        top: 20,
+        bottom: 20,
+        width: 374,
+        height: 760,
+    },
+};
+
+// Email client compatibility warnings
+export const EMAIL_WARNINGS = {
+    maxWidth: 'Content exceeds 600px - may not display properly in some email clients',
+    minWidth: 'Content below 320px - may be difficult to read on mobile',
+    padding: 'Content too close to edges - may be cut off in some email clients',
+    overflow: 'Content extends beyond safe area - may cause horizontal scrolling',
 };
 
 // Zoom levels for canvas (independent of device dimensions)

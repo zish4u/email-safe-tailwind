@@ -57,6 +57,7 @@ export default function EnhancedTemplateBuilder() {
     const [previewMode, setPreviewMode] = useState<PreviewMode>('desktop');
     const [canvasZoom, setCanvasZoom] = useState(DEFAULT_ZOOM);
     const [showGrid, setShowGrid] = useState(true);
+    const [showSafeArea, setShowSafeArea] = useState(true);
     const [snapToGrid, setSnapToGrid] = useState(true);
     const [showPreview, setShowPreview] = useState(false);
     const [editingComponent, setEditingComponent] = useState<TemplateComponent | null>(null);
@@ -383,6 +384,15 @@ export default function EnhancedTemplateBuilder() {
                             <label className="flex items-center gap-2 text-xs cursor-pointer">
                                 <input
                                     type="checkbox"
+                                    checked={showSafeArea}
+                                    onChange={(e) => setShowSafeArea(e.target.checked)}
+                                    className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
+                                />
+                                <span className="text-gray-300">Safe Area</span>
+                            </label>
+                            <label className="flex items-center gap-2 text-xs cursor-pointer">
+                                <input
+                                    type="checkbox"
                                     checked={snapToGrid}
                                     onChange={(e) => setSnapToGrid(e.target.checked)}
                                     className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
@@ -458,6 +468,7 @@ export default function EnhancedTemplateBuilder() {
                                 previewMode={previewMode}
                                 canvasZoom={canvasZoom}
                                 showGrid={showGrid}
+                                showSafeArea={showSafeArea}
                                 snapToGrid={snapToGrid}
                                 isDragging={isDragging}
                                 isResizing={isResizing}

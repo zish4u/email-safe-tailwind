@@ -3,6 +3,9 @@ import React, { memo, useCallback, useMemo } from 'react';
 import {
     TemplateComponent,
     CANVAS_SIZES,
+    SAFE_AREA_BOUNDARIES,
+    EMAIL_CLIENT_DIMENSIONS,
+    EMAIL_WARNINGS,
     PreviewMode,
     isContainerType,
     ComponentType,
@@ -33,6 +36,7 @@ interface BuilderCanvasProps {
     previewMode: PreviewMode;
     canvasZoom: number;
     showGrid: boolean;
+    showSafeArea: boolean;
     snapToGrid: boolean;
     isDragging: boolean;
     isResizing: boolean;
@@ -62,6 +66,7 @@ export const BuilderCanvas = memo(function BuilderCanvas({
     previewMode,
     canvasZoom,
     showGrid,
+    showSafeArea,
     isDragging,
     isResizing,
     canvasRef,
@@ -78,6 +83,8 @@ export const BuilderCanvas = memo(function BuilderCanvas({
     onOpenEditor,
 }: BuilderCanvasProps) {
     const canvasSize = CANVAS_SIZES[previewMode];
+    const safeArea = SAFE_AREA_BOUNDARIES[previewMode];
+    const emailDimensions = EMAIL_CLIENT_DIMENSIONS[previewMode];
 
     // Build the component tree from flat list
     const rootComponents = useMemo(() => buildComponentTree(components), [components]);
@@ -254,13 +261,23 @@ export const BuilderCanvas = memo(function BuilderCanvas({
                             <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
                             <div className="w-3 h-3 rounded-full bg-green-500/80" />
                         </div>
-                        <span className="text-sm font-medium text-white">Canvas</span>
-                        <span className="text-xs text-gray-400 bg-gray-700/50 px-2 py-0.5 rounded">
-                            {components.length} components
-                        </span>
+                        <span className="text-sm font-medium text-white">Email Canvas</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400 bg-gray-700/50 px-2 py-0.5 rounded">
+                                {components.length} components
+                            </span>
+                            <span className="text-xs text-blue-400 bg-blue-900/30 px-2 py-0.5 rounded">
+                                {emailDimensions.safeWidth}px safe width
+                            </span>
+                        </div>
                     </div>
-                    <div className="text-xs text-gray-400">
-                        {canvasSize.width}px width
+                    <div className="flex items-center gap-3">
+                        <div className="text-xs text-gray-400">
+                            {canvasSize.width}px × {canvasSize.height}px
+                        </div>
+                        <div className="text-xs text-green-400">
+                            Max: {emailDimensions.maxWidth}px
+                        </div>
                     </div>
                 </div>
             </div>
@@ -297,6 +314,55 @@ export const BuilderCanvas = memo(function BuilderCanvas({
                         }
                     }}
                 >
+                    {/* Safe Area Overlay */}
+                    {showSafeArea && (
+                        <div
+                            className="absolute border-2 border-blue-500/30 bg-blue-500/5 pointer-events-none z-10"
+                            style={{
+                                left: `${safeArea.left}px`,
+                                top: `${safeArea.top}px`,
+                                width: `${safeArea.width}px`,
+                                height: `${safeArea.height}px`,
+                            }}
+                        >
+                            <div className="absolute -top-6 left-0 text-xs text-blue-600 font-medium bg-white px-2 py-1 rounded shadow-sm border border-blue-200">
+                                Safe Area ({safeArea.width}px × {safeArea.height}px)
+                            </div>
+                            <div className="absolute top-2 left-2 text-xs text-blue-600 opacity-70">
+                                Gmail, Outlook, Apple Mail Compatible
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Warning Zones */}
+                    {showSafeArea && (
+                        <>
+                            {/* Left Warning Zone */}
+                            <div
+                                className="absolute top-0 bottom-0 bg-red-500/10 border-r border-red-500/20 pointer-events-none"
+                                style={{
+                                    left: 0,
+                                    width: `${safeArea.left}px`,
+                                }}
+                            >
+                                <div className="absolute top-2 left-2 text-xs text-red-600 opacity-70 transform -rotate-90 origin-left">
+                                    Unsafe Area
+                                </div>
+                            </div>
+                            {/* Right Warning Zone */}
+                            <div
+                                className="absolute top-0 bottom-0 bg-red-500/10 border-l border-red-500/20 pointer-events-none"
+                                style={{
+                                    right: 0,
+                                    width: `${safeArea.right}px`,
+                                }}
+                            >
+                                <div className="absolute top-2 right-2 text-xs text-red-600 opacity-70 transform rotate-90 origin-right">
+                                    Unsafe Area
+                                </div>
+                            </div>
+                        </>
+                    )}
                     {/* Render Root Components (Sections) */}
                     {rootComponents.map((component) => (
                         <CanvasComponent
@@ -321,8 +387,17 @@ export const BuilderCanvas = memo(function BuilderCanvas({
                     {/* Empty State / Dropzone hint */}
                     {rootComponents.length === 0 && (
                         <div className="flex-1 flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-200 m-4 rounded-lg">
-                            <p className="text-lg font-medium">Drop a Section here</p>
-                            <p className="text-sm text-gray-400">Start with a layout section</p>
+                            <div className="text-center mb-4">
+                                <p className="text-lg font-medium">Drop a Section here</p>
+                                <p className="text-sm text-gray-400">Start with a layout section</p>
+                            </div>
+                            {showSafeArea && (
+                                <div className="text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded border border-blue-200">
+                                    <div className="font-medium mb-1">Email Safe Area Active</div>
+                                    <div>Content within {safeArea.width}px × {safeArea.height}px</div>
+                                    <div>Compatible with Gmail, Outlook, Apple Mail</div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
