@@ -1,5 +1,6 @@
 import React from 'react';
 import { ButtonProps } from './types';
+import { SpacingProps, BorderProps } from './types';
 
 export const Button: React.FC<ButtonProps> = ({
     text,
@@ -28,7 +29,6 @@ export const Button: React.FC<ButtonProps> = ({
     link,
     linkTarget = '_blank',
     disabled = false,
-    backgroundColor: bgColor,
     backgroundImage,
     padding,
     margin,
@@ -44,7 +44,8 @@ export const Button: React.FC<ButtonProps> = ({
     style = {},
     id,
 }) => {
-    const getSpacingStyles = (spacing?: any): React.CSSProperties => {
+    // Memoized style calculations to prevent unnecessary re-renders
+    const getSpacingStyles = React.useCallback((spacing?: SpacingProps): React.CSSProperties => {
         if (!spacing) return {};
 
         const styles: React.CSSProperties = {};
@@ -67,9 +68,9 @@ export const Button: React.FC<ButtonProps> = ({
         }
 
         return styles;
-    };
+    }, []);
 
-    const getMarginStyles = (margin?: any): React.CSSProperties => {
+    const getMarginStyles = React.useCallback((margin?: SpacingProps): React.CSSProperties => {
         if (!margin) return {};
 
         const styles: React.CSSProperties = {};
@@ -92,9 +93,9 @@ export const Button: React.FC<ButtonProps> = ({
         }
 
         return styles;
-    };
+    }, []);
 
-    const getBorderStyles = (border?: any): React.CSSProperties => {
+    const getBorderStyles = React.useCallback((border?: BorderProps): React.CSSProperties => {
         if (!border) return {};
 
         const styles: React.CSSProperties = {};
@@ -110,9 +111,9 @@ export const Button: React.FC<ButtonProps> = ({
         }
 
         return styles;
-    };
+    }, []);
 
-    const getVariantClasses = () => {
+    const getVariantClasses = React.useCallback(() => {
         switch (variant) {
             case 'primary':
                 return 'bg-blue-600 text-white border-blue-600';
@@ -123,9 +124,9 @@ export const Button: React.FC<ButtonProps> = ({
             default:
                 return 'bg-blue-600 text-white border-blue-600';
         }
-    };
+    }, [variant]);
 
-    const getSizeClasses = () => {
+    const getSizeClasses = React.useCallback(() => {
         switch (size) {
             case 'sm':
                 return 'px-3 py-2 text-sm';
@@ -136,9 +137,42 @@ export const Button: React.FC<ButtonProps> = ({
             default:
                 return 'px-6 py-3 text-base';
         }
-    };
+    }, [size]);
+
+    // Memoize the final styles to prevent unnecessary recalculations
+    const buttonStyles = React.useMemo(() => {
+        const spacingStyles = getSpacingStyles(padding);
+        const marginStyles = getMarginStyles(margin);
+        const borderStyles = getBorderStyles(border);
+
+        return {
+            ...spacingStyles,
+            ...marginStyles,
+            ...borderStyles,
+            backgroundColor,
+            backgroundImage,
+            boxShadow,
+            width: width !== 'auto' ? width : undefined,
+            height: height !== 'auto' ? height : undefined,
+            minWidth,
+            maxWidth,
+            minHeight,
+            maxHeight,
+            fontFamily,
+            fontSize,
+            fontWeight,
+            textAlign,
+            textTransform,
+            borderRadius,
+            opacity: disabled ? 0.6 : 1,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            ...style,
+        };
+    }, [padding, margin, border, backgroundColor, backgroundImage, boxShadow, width, height, minWidth, maxWidth, minHeight, maxHeight, fontFamily, fontSize, fontWeight, textAlign, textTransform, borderRadius, disabled, style, getSpacingStyles, getMarginStyles, getBorderStyles]);
 
     const widthClass = fullWidth ? 'w-full' : '';
+    const variantClasses = getVariantClasses();
+    const sizeClasses = getSizeClasses();
 
     const combinedClasses = `
         inline-block
@@ -150,44 +184,11 @@ export const Button: React.FC<ButtonProps> = ({
         transition-all
         hover:opacity-90
         ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-        ${getVariantClasses()}
-        ${getSizeClasses()}
+        ${variantClasses}
+        ${sizeClasses}
         ${widthClass}
         ${className}
     `.trim().replace(/\s+/g, ' ');
-
-    const buttonStyles: React.CSSProperties = {
-        backgroundColor: backgroundColor || (variant === 'primary' ? '#007bff' : variant === 'secondary' ? '#6c757d' : 'transparent'),
-        color: textColor || (variant === 'outline' ? '#007bff' : '#ffffff'),
-        borderColor: borderColor || (variant === 'primary' ? '#007bff' : variant === 'secondary' ? '#6c757d' : '#007bff'),
-        borderWidth: `${borderWidth}px`,
-        borderStyle,
-        borderRadius: typeof borderRadius === 'string' ? borderRadius : borderRadius ? '4px' : undefined,
-        width: fullWidth ? '100%' : typeof width === 'number' ? `${width}px` : width,
-        height: typeof height === 'number' ? `${height}px` : height,
-        minWidth: minWidth ? `${minWidth}px` : undefined,
-        maxWidth: maxWidth ? `${maxWidth}px` : undefined,
-        minHeight: minHeight ? `${minHeight}px` : undefined,
-        maxHeight: maxHeight ? `${maxHeight}px` : undefined,
-        fontFamily,
-        fontSize: typeof fontSize === 'number' ? `${fontSize}px` : fontSize,
-        fontWeight,
-        textAlign,
-        textTransform,
-        backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
-        backgroundSize: backgroundImage ? 'cover' : undefined,
-        backgroundPosition: backgroundImage ? 'center' : undefined,
-        backgroundRepeat: backgroundImage ? 'no-repeat' : undefined,
-        boxShadow,
-        paddingTop: paddingY ? `${paddingY}px` : undefined,
-        paddingBottom: paddingY ? `${paddingY}px` : undefined,
-        paddingLeft: paddingX ? `${paddingX}px` : undefined,
-        paddingRight: paddingX ? `${paddingX}px` : undefined,
-        ...getSpacingStyles(padding),
-        ...getMarginStyles(margin),
-        ...getBorderStyles(border),
-        ...style,
-    };
 
     const buttonContent = text || 'Button';
     const buttonLink = link || href;

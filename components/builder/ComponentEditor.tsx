@@ -1,23 +1,27 @@
-"use client"
 import React from 'react';
 import * as EmailComponents from '../email-components';
+import { TemplateComponent } from '../../app/builder/types';
 
 interface ComponentEditorProps {
-    component: any;
-    onUpdate: (props: Record<string, any>) => void;
+    component: TemplateComponent;
+    onUpdate: (props: Record<string, unknown>) => void;
     onClose: () => void;
 }
 
 export const ComponentEditor: React.FC<ComponentEditorProps> = ({ component, onUpdate, onClose }) => {
     const [localProps, setLocalProps] = React.useState(component.props);
 
-    const handlePropChange = (propName: string, value: any) => {
+    const handlePropChange = (propName: string, value: unknown) => {
         const newProps = { ...localProps, [propName]: value };
         setLocalProps(newProps);
         onUpdate(newProps);
     };
 
-    const renderAdvancedPropEditor = (propName: string, propValue: any) => {
+    const renderAdvancedPropEditor = (propName: string, propValue: unknown) => {
+        const stringValue = String(propValue || '');
+        const isBoolean = typeof propValue === 'boolean';
+        const isArray = Array.isArray(propValue);
+
         // Color picker with preset options
         if (propName.includes('color') || propName.includes('Color')) {
             const colorPresets = [
@@ -30,13 +34,13 @@ export const ComponentEditor: React.FC<ComponentEditorProps> = ({ component, onU
                     <div className="flex items-center gap-2">
                         <input
                             type="color"
-                            value={propValue.startsWith('#') ? propValue : '#000000'}
+                            value={stringValue.startsWith('#') ? stringValue : '#000000'}
                             onChange={(e) => handlePropChange(propName, e.target.value)}
                             className="w-12 h-12 border border-gray-600 rounded cursor-pointer"
                         />
                         <input
                             type="text"
-                            value={propValue}
+                            value={stringValue}
                             onChange={(e) => handlePropChange(propName, e.target.value)}
                             className="flex-1 bg-gray-700 text-gray-100 px-3 py-2 rounded text-sm"
                             placeholder="#000000"
@@ -70,7 +74,7 @@ export const ComponentEditor: React.FC<ComponentEditorProps> = ({ component, onU
             return (
                 <div className="space-y-2">
                     <select
-                        value={options.includes(propValue) ? propValue : 'custom'}
+                        value={options.includes(stringValue) ? stringValue : 'custom'}
                         onChange={(e) => handlePropChange(propName, e.target.value === 'custom' ? propValue : e.target.value)}
                         className="w-full bg-gray-700 text-gray-100 px-3 py-2 rounded text-sm"
                     >
@@ -79,10 +83,10 @@ export const ComponentEditor: React.FC<ComponentEditorProps> = ({ component, onU
                         ))}
                         <option value="custom">Custom</option>
                     </select>
-                    {!options.includes(propValue) && (
+                    {!options.includes(stringValue) && (
                         <input
                             type="text"
-                            value={propValue}
+                            value={stringValue}
                             onChange={(e) => handlePropChange(propName, e.target.value)}
                             className="w-full bg-gray-700 text-gray-100 px-3 py-2 rounded text-sm"
                             placeholder="Enter custom value"
@@ -101,9 +105,9 @@ export const ComponentEditor: React.FC<ComponentEditorProps> = ({ component, onU
                         <button
                             key={align}
                             onClick={() => handlePropChange(propName, align)}
-                            className={`px-3 py-2 rounded text-sm capitalize ${propValue === align
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            className={`px-3 py-2 rounded text-sm capitalize ${stringValue === align
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                 }`}
                         >
                             {align}
@@ -114,11 +118,11 @@ export const ComponentEditor: React.FC<ComponentEditorProps> = ({ component, onU
         }
 
         // Typography controls
-        if (propName === 'variant' && ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'small', 'span'].includes(String(propValue))) {
+        if (propName === 'variant' && ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'small', 'span'].includes(stringValue)) {
             const textVariants = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'small', 'span'];
             return (
                 <select
-                    value={propValue}
+                    value={stringValue}
                     onChange={(e) => handlePropChange(propName, e.target.value)}
                     className="w-full bg-gray-700 text-gray-100 px-3 py-2 rounded text-sm"
                 >
@@ -143,7 +147,7 @@ export const ComponentEditor: React.FC<ComponentEditorProps> = ({ component, onU
 
             return (
                 <select
-                    value={propValue}
+                    value={stringValue}
                     onChange={(e) => handlePropChange(propName, e.target.value)}
                     className="w-full bg-gray-700 text-gray-100 px-3 py-2 rounded text-sm"
                 >
@@ -161,7 +165,7 @@ export const ComponentEditor: React.FC<ComponentEditorProps> = ({ component, onU
             return (
                 <div className="space-y-2">
                     <select
-                        value={dimensionPresets.includes(String(propValue)) ? propValue : 'custom'}
+                        value={dimensionPresets.includes(stringValue) ? stringValue : 'custom'}
                         onChange={(e) => handlePropChange(propName, e.target.value === 'custom' ? propValue : e.target.value)}
                         className="w-full bg-gray-700 text-gray-100 px-3 py-2 rounded text-sm"
                     >
@@ -170,10 +174,10 @@ export const ComponentEditor: React.FC<ComponentEditorProps> = ({ component, onU
                         ))}
                         <option value="custom">Custom</option>
                     </select>
-                    {!dimensionPresets.includes(String(propValue)) && (
+                    {!dimensionPresets.includes(stringValue) && (
                         <input
                             type="text"
-                            value={propValue}
+                            value={stringValue}
                             onChange={(e) => handlePropChange(propName, e.target.value)}
                             className="w-full bg-gray-700 text-gray-100 px-3 py-2 rounded text-sm"
                             placeholder="Enter dimensions (px, %, rem, etc.)"
@@ -189,7 +193,7 @@ export const ComponentEditor: React.FC<ComponentEditorProps> = ({ component, onU
                 <div className="space-y-2">
                     <input
                         type="url"
-                        value={propValue}
+                        value={stringValue}
                         onChange={(e) => handlePropChange(propName, e.target.value)}
                         className="w-full bg-gray-700 text-gray-100 px-3 py-2 rounded text-sm"
                         placeholder="https://example.com/image.jpg"
@@ -288,14 +292,14 @@ export const ComponentEditor: React.FC<ComponentEditorProps> = ({ component, onU
             return (
                 <div className="space-y-2">
                     <textarea
-                        value={propValue}
+                        value={stringValue}
                         onChange={(e) => handlePropChange(propName, e.target.value)}
                         className="w-full bg-gray-700 text-gray-100 px-3 py-2 rounded text-sm h-32 resize-none"
                         placeholder="Enter content..."
                     />
                     <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded">
-                        Preview: <span dangerouslySetInnerHTML={{ __html: propValue.substring(0, 100) }} />
-                        {propValue.length > 100 && '...'}
+                        Preview: <span dangerouslySetInnerHTML={{ __html: stringValue.substring(0, 100) }} />
+                        {stringValue.length > 100 && '...'}
                     </div>
                 </div>
             );
