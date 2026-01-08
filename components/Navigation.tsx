@@ -25,18 +25,18 @@ export const Navigation: React.FC = () => {
                         <Link
                             href="/"
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${isActive('/')
-                                    ? 'bg-accent text-white shadow-sm'
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                ? 'bg-accent text-white shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                                 }`}
                             aria-current={isActive('/') ? 'page' : undefined}
                         >
                             Converter
                         </Link>
                         <Link
-                            href="/builder"
+                            href="/template-builder"
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${isActive('/builder')
-                                    ? 'bg-accent text-white shadow-sm'
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                ? 'bg-accent text-white shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                                 }`}
                             aria-current={isActive('/builder') ? 'page' : undefined}
                         >

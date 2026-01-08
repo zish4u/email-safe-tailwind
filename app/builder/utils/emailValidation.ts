@@ -3,7 +3,7 @@
  * Ensures templates are compatible with major email clients
  */
 
-import { EMAIL_CLIENT_DIMENSIONS, SAFE_AREA_BOUNDARIES, EMAIL_WARNINGS, PreviewMode } from '../types';
+import { EMAIL_CLIENT_DIMENSIONS, SAFE_AREA_BOUNDARIES, EMAIL_WARNINGS, SAFE_AREA_RULES, PreviewMode } from '../types';
 
 export interface ValidationResult {
     isValid: boolean;
@@ -21,7 +21,8 @@ export interface DimensionCheck {
 }
 
 /**
- * Validates if dimensions are safe for email clients
+ * STRICTLY validates if dimensions are safe for email clients
+ * Enforces safe area boundaries without exceptions
  */
 export function validateEmailDimensions(
     width: number,
@@ -35,24 +36,27 @@ export function validateEmailDimensions(
     const errors: string[] = [];
     const suggestions: string[] = [];
 
-    // Width validation
+    // STRICT WIDTH ENFORCEMENT
+    if (width > safeArea.width) {
+        errors.push(EMAIL_WARNINGS.strictExceed);
+        errors.push(`Maximum allowed width: ${safeArea.width}px (safe area)`);
+        suggestions.push(`Component will be auto-resized to ${safeArea.width}px`);
+    }
+
     if (width > dimensions.maxWidth) {
         errors.push(EMAIL_WARNINGS.maxWidth);
-        suggestions.push(`Reduce width to ${dimensions.safeWidth}px or less for optimal compatibility`);
-    } else if (width > safeArea.width) {
-        warnings.push(EMAIL_WARNINGS.padding);
-        suggestions.push(`Consider reducing width to ${safeArea.width}px to stay within safe area`);
+        suggestions.push(`Email client maximum: ${dimensions.maxWidth}px`);
     }
 
     if (width < dimensions.minWidth) {
         warnings.push(EMAIL_WARNINGS.minWidth);
-        suggestions.push(`Increase width to at least ${dimensions.minWidth}px for better readability`);
+        suggestions.push(`Minimum recommended: ${dimensions.minWidth}px`);
     }
 
-    // Height validation (less critical but still important)
+    // Height validation
     if (height > 2000) {
-        warnings.push('Email height exceeds 2000px - may be truncated in some clients');
-        suggestions.push('Consider breaking long content into multiple sections');
+        warnings.push('Email height exceeds 2000px - may be truncated');
+        suggestions.push('Break long content into multiple sections');
     }
 
     return {
@@ -181,31 +185,105 @@ export function validateComponentForEmail(
 }
 
 /**
- * Gets email client compatibility info
+ * STRICTLY enforces safe area boundaries - resizes components if needed
+ * No exceptions allowed for email client compatibility
  */
-export function getEmailClientInfo(previewMode: PreviewMode) {
-    const dimensions = EMAIL_CLIENT_DIMENSIONS[previewMode];
+export function enforceSafeAreaBoundaries(
+    component: any,
+    previewMode: PreviewMode
+): any {
     const safeArea = SAFE_AREA_BOUNDARIES[previewMode];
+    const dimensions = EMAIL_CLIENT_DIMENSIONS[previewMode];
+
+    const updatedComponent = { ...component };
+
+    // STRICT WIDTH ENFORCEMENT
+    if (updatedComponent.size?.width > safeArea.width) {
+        updatedComponent.size = {
+            ...updatedComponent.size,
+            width: safeArea.width
+        };
+    }
+
+    // STRICT POSITION ENFORCEMENT
+    if (updatedComponent.position) {
+        const optimalPos = getOptimalPosition(
+            updatedComponent.size?.width || 100,
+            updatedComponent.size?.height || 100,
+            previewMode,
+            updatedComponent.position.x,
+            updatedComponent.position.y
+        );
+        updatedComponent.position = optimalPos;
+    }
+
+    return updatedComponent;
+}
+
+/**
+ * Gets maximum allowed dimensions for safe area compliance
+ */
+export function getMaximumSafeDimensions(
+    previewMode: PreviewMode
+): { width: number; height: number; maxWidth: number } {
+    const safeArea = SAFE_AREA_BOUNDARIES[previewMode];
+    const dimensions = EMAIL_CLIENT_DIMENSIONS[previewMode];
 
     return {
-        safeWidth: safeArea.width,
-        maxWidth: dimensions.maxWidth,
-        minWidth: dimensions.minWidth,
-        recommendedWidth: dimensions.safeWidth,
-        padding: dimensions.padding,
-        compatibleClients: [
-            'Gmail',
-            'Outlook',
-            'Apple Mail',
-            'Yahoo Mail',
-            'Thunderbird'
-        ],
-        unsupportedFeatures: [
-            'position: fixed',
-            'float: left/right',
-            'CSS Grid',
-            'Flexbox (limited)',
-            'background-attachment: fixed'
-        ]
+        width: safeArea.width,
+        height: safeArea.height,
+        maxWidth: dimensions.maxWidth
+    };
+}
+
+/**
+ * Validates and auto-corrects component to ensure safe area compliance
+ */
+export function ensureSafeAreaCompliance(
+    component: any,
+    previewMode: PreviewMode
+): { component: any; wasModified: boolean; corrections: string[] } {
+    const corrections: string[] = [];
+    let wasModified = false;
+
+    const safeArea = SAFE_AREA_BOUNDARIES[previewMode];
+    const updatedComponent = { ...component };
+
+    // Check and enforce width limits
+    if (updatedComponent.size?.width > safeArea.width) {
+        updatedComponent.size.width = safeArea.width;
+        corrections.push(`Width resized to ${safeArea.width}px (safe area limit)`);
+        wasModified = true;
+    }
+
+    // Check and enforce position within safe area
+    if (updatedComponent.position) {
+        const { x, y } = updatedComponent.position;
+        const componentWidth = updatedComponent.size?.width || 100;
+        const componentHeight = updatedComponent.size?.height || 100;
+
+        if (x < safeArea.left) {
+            updatedComponent.position.x = safeArea.left;
+            corrections.push(`X position adjusted to safe area`);
+            wasModified = true;
+        }
+
+        if (y < safeArea.top) {
+            updatedComponent.position.y = safeArea.top;
+            corrections.push(`Y position adjusted to safe area`);
+            wasModified = true;
+        }
+
+        if (x + componentWidth > safeArea.left + safeArea.width) {
+            updatedComponent.position.x = safeArea.left + safeArea.width - componentWidth;
+            corrections.push(`X position adjusted to fit within safe area`);
+            wasModified = true;
+        }
+    }
+
+    return {
+        component: updatedComponent,
+        wasModified,
+        corrections
     };
 }

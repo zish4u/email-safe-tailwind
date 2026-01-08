@@ -219,12 +219,22 @@ export const SAFE_AREA_BOUNDARIES: Record<PreviewMode, {
     },
 };
 
-// Email client compatibility warnings
+// Email client compatibility warnings (strict enforcement)
 export const EMAIL_WARNINGS = {
-    maxWidth: 'Content exceeds 600px - may not display properly in some email clients',
-    minWidth: 'Content below 320px - may be difficult to read on mobile',
-    padding: 'Content too close to edges - may be cut off in some email clients',
-    overflow: 'Content extends beyond safe area - may cause horizontal scrolling',
+    maxWidth: 'Content exceeds 600px - will break in some email clients',
+    minWidth: 'Content below 320px - difficult to read on mobile',
+    padding: 'Content too close to edges - will be cut off in email clients',
+    overflow: 'Content extends beyond safe area - WILL CAUSE UI BREAKS',
+    strictExceed: 'Component exceeds safe area - RESIZED AUTOMATICALLY',
+};
+
+// Strict safe area enforcement rules
+export const SAFE_AREA_RULES = {
+    enforceWidth: true,        // Strictly enforce max width
+    enforcePosition: true,     // Keep components within safe area
+    autoResize: true,         // Auto-resize oversized components
+    preventOverflow: true,    // Prevent any overflow beyond safe area
+    snapToSafe: true,         // Snap components to safe area when dropped
 };
 
 // Zoom levels for canvas (independent of device dimensions)
