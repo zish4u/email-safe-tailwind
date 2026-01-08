@@ -138,6 +138,15 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
     // Component actions
     addComponent: (component, parentId, index) => {
         set(state => {
+            // Validation: prevent columns from being added to non-section parents
+            if (component.type === 'column' && parentId) {
+                const parent = findComponentById(state.components, parentId);
+                if (parent && parent.type !== 'section') {
+                    console.warn('Columns can only be placed inside sections');
+                    return state; // Don't add the component
+                }
+            }
+
             const newComponents = addComponentToTree(state.components, component, parentId, index);
             const newHistory = [
                 ...state.history.slice(0, state.historyIndex + 1),

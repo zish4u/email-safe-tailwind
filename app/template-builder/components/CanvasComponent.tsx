@@ -80,6 +80,44 @@ export default function CanvasComponent({ component, parentId }: CanvasComponent
         deleteComponent(component.id);
     };
 
+    // Common overlays for all components
+    const renderOverlays = () => (
+        <>
+            {/* Selection Overlay */}
+            {isSelected && (
+                <div className="absolute inset-0 border-2 border-purple-500 pointer-events-none z-10">
+                    <div className="absolute -top-6 left-0 bg-purple-500 text-white text-xs px-2 py-1 rounded-t flex items-center gap-2">
+                        <span className="font-medium">{component.name}</span>
+                        <button
+                            onClick={handleDelete}
+                            className="pointer-events-auto hover:bg-purple-600 p-0.5 rounded"
+                        >
+                            <Icons.X className="w-3 h-3" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Hover Overlay */}
+            {!isSelected && (
+                <div className="absolute inset-0 border-2 border-transparent group-hover:border-blue-400 opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-5">
+                    <div className="absolute -top-6 left-0 bg-blue-500 text-white text-xs px-2 py-1 rounded-t opacity-0 group-hover:opacity-100">
+                        {component.name}
+                    </div>
+                </div>
+            )}
+
+            {/* Drag Handle */}
+            <div
+                {...listeners}
+                {...attributes}
+                className="absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 cursor-move z-20"
+            >
+                <Icons.GripVertical className="w-4 h-4 text-gray-400" />
+            </div>
+        </>
+    );
+
     // Render component based on type
     const renderComponent = () => {
         switch (component.type) {
@@ -200,24 +238,9 @@ export default function CanvasComponent({ component, parentId }: CanvasComponent
                 );
             }
 
+            // Columns are handled specially in the return statement to avoid wrapper divs
             case 'column':
-                return (
-                    <td
-                        ref={canHaveChildren ? setDropRef : undefined}
-                        style={inlineStyles}
-                        width={component.props.width || '50%'}
-                    >
-                        {component.children && component.children.length > 0 ? (
-                            component.children.map((child) => (
-                                <CanvasComponent key={child.id} component={child} parentId={component.id} />
-                            ))
-                        ) : (
-                            <div className="min-h-[60px] flex items-center justify-center border-2 border-dashed border-gray-300 text-gray-400 text-xs">
-                                Drop here
-                            </div>
-                        )}
-                    </td>
-                );
+                return null;
 
             default:
                 return (
@@ -228,44 +251,41 @@ export default function CanvasComponent({ component, parentId }: CanvasComponent
         }
     };
 
+    // Special rendering for columns to avoid wrapper div (which breaks table layout)
+    if (component.type === 'column') {
+        return (
+            <td
+                ref={(node) => {
+                    setDragRef(node);
+                    if (canHaveChildren) setDropRef(node);
+                }}
+                className={`relative group ${isDragging ? 'opacity-50' : 'opacity-100'}`}
+                onClick={handleClick}
+                style={inlineStyles}
+                width={component.props.width || '50%'}
+            >
+                {renderOverlays()}
+                {component.children && component.children.length > 0 ? (
+                    component.children.map((child) => (
+                        <CanvasComponent key={child.id} component={child} parentId={component.id} />
+                    ))
+                ) : (
+                    <div className="min-h-[60px] flex items-center justify-center border-2 border-dashed border-gray-300 text-gray-400 text-xs">
+                        Drop here
+                    </div>
+                )}
+            </td>
+        );
+    }
+
+    // Default rendering with wrapper for other components
     return (
         <div
             ref={setDragRef}
             className={`relative group ${isDragging ? 'opacity-50' : 'opacity-100'}`}
             onClick={handleClick}
         >
-            {/* Selection Overlay */}
-            {isSelected && (
-                <div className="absolute inset-0 border-2 border-purple-500 pointer-events-none z-10">
-                    <div className="absolute -top-6 left-0 bg-purple-500 text-white text-xs px-2 py-1 rounded-t flex items-center gap-2">
-                        <span className="font-medium">{component.name}</span>
-                        <button
-                            onClick={handleDelete}
-                            className="pointer-events-auto hover:bg-purple-600 p-0.5 rounded"
-                        >
-                            <Icons.X className="w-3 h-3" />
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Hover Overlay */}
-            {!isSelected && (
-                <div className="absolute inset-0 border-2 border-transparent group-hover:border-blue-400 opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-5">
-                    <div className="absolute -top-6 left-0 bg-blue-500 text-white text-xs px-2 py-1 rounded-t opacity-0 group-hover:opacity-100">
-                        {component.name}
-                    </div>
-                </div>
-            )}
-
-            {/* Drag Handle */}
-            <div
-                {...listeners}
-                {...attributes}
-                className="absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 cursor-move z-20"
-            >
-                <Icons.GripVertical className="w-4 h-4 text-gray-400" />
-            </div>
+            {renderOverlays()}
 
             {/* Component Content */}
             <div className={component.hidden ? 'opacity-30' : ''}>
