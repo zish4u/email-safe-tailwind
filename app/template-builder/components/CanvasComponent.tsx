@@ -107,26 +107,34 @@ export default function CanvasComponent({ component, parentId }: CanvasComponent
                     />
                 );
 
-            case 'button':
+            case 'button': {
+                const align = inlineStyles.textAlign || 'center';
                 return (
-                    <table border={0} cellPadding={0} cellSpacing={0} role="presentation" style={{ margin: '0 auto' }}>
+                    <table border={0} cellPadding={0} cellSpacing={0} role="presentation" width="100%">
                         <tr>
-                            <td style={inlineStyles}>
-                                <a
-                                    href={component.props.href || '#'}
-                                    target={component.props.target || '_blank'}
-                                    style={{
-                                        color: inlineStyles.color,
-                                        textDecoration: 'none',
-                                        display: 'inline-block',
-                                    }}
-                                >
-                                    {component.props.text || 'Button'}
-                                </a>
+                            <td align={align as 'left' | 'center' | 'right'}>
+                                <table border={0} cellPadding={0} cellSpacing={0} role="presentation">
+                                    <tr>
+                                        <td style={inlineStyles}>
+                                            <a
+                                                href={component.props.href || '#'}
+                                                target={component.props.target || '_blank'}
+                                                style={{
+                                                    color: inlineStyles.color,
+                                                    textDecoration: 'none',
+                                                    display: 'inline-block',
+                                                }}
+                                            >
+                                                {component.props.text || 'Button'}
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
                             </td>
                         </tr>
                     </table>
                 );
+            }
 
             case 'spacer':
                 return (
@@ -152,7 +160,10 @@ export default function CanvasComponent({ component, parentId }: CanvasComponent
                     />
                 );
 
-            case 'section':
+            case 'section': {
+                // Check if children are columns to wrap them in a row
+                const hasColumns = component.children?.some(child => child.type === 'column');
+
                 return (
                     <table
                         border={0}
@@ -162,21 +173,32 @@ export default function CanvasComponent({ component, parentId }: CanvasComponent
                         width="100%"
                         style={inlineStyles}
                     >
-                        <tr>
-                            <td ref={canHaveChildren ? setDropRef : undefined}>
-                                {component.children && component.children.length > 0 ? (
-                                    component.children.map((child) => (
-                                        <CanvasComponent key={child.id} component={child} parentId={component.id} />
-                                    ))
-                                ) : (
-                                    <div className="min-h-[80px] flex items-center justify-center border-2 border-dashed border-gray-300 text-gray-400 text-sm">
-                                        Drop components here
-                                    </div>
-                                )}
-                            </td>
-                        </tr>
+                        {hasColumns ? (
+                            // If has columns, wrap them in a single row for horizontal layout
+                            <tr ref={canHaveChildren ? setDropRef : undefined}>
+                                {component.children?.map((child) => (
+                                    <CanvasComponent key={child.id} component={child} parentId={component.id} />
+                                ))}
+                            </tr>
+                        ) : (
+                            // Otherwise, render children normally (vertically stacked)
+                            <tr>
+                                <td ref={canHaveChildren ? setDropRef : undefined}>
+                                    {component.children && component.children.length > 0 ? (
+                                        component.children.map((child) => (
+                                            <CanvasComponent key={child.id} component={child} parentId={component.id} />
+                                        ))
+                                    ) : (
+                                        <div className="min-h-[80px] flex items-center justify-center border-2 border-dashed border-gray-300 text-gray-400 text-sm">
+                                            Drop components here
+                                        </div>
+                                    )}
+                                </td>
+                            </tr>
+                        )}
                     </table>
                 );
+            }
 
             case 'column':
                 return (

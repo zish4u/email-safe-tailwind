@@ -219,10 +219,13 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
         const component = findComponentById(state.components, id);
         if (!component) return;
 
+        // Client-safe ID generation
+        const generateId = () => `comp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
         // Deep clone and assign new IDs
         const cloneWithNewIds = (node: ComponentNode): ComponentNode => {
             const newNode = JSON.parse(JSON.stringify(node));
-            newNode.id = crypto.randomUUID();
+            newNode.id = generateId();
             newNode.name = `${node.name} (Copy)`;
             if (newNode.children) {
                 newNode.children = newNode.children.map(cloneWithNewIds);

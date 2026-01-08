@@ -4,7 +4,6 @@
  * Factory functions to create component instances with sensible defaults.
  */
 
-import { v4 as uuidv4 } from 'uuid';
 import type {
     ComponentNode,
     ComponentType,
@@ -22,9 +21,17 @@ import type {
 } from '../types';
 
 /**
- * Generate a unique component ID
+ * Generate a unique component ID (client-safe, no SSR hydration issues)
  */
-const generateId = (): string => uuidv4();
+let idCounter = 0;
+const generateId = (): string => {
+    if (typeof window !== 'undefined') {
+        // Client-side: use timestamp + random
+        return `comp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    }
+    // Server-side: use counter to ensure consistency
+    return `comp-ssr-${++idCounter}`;
+};
 
 /**
  * Create a Text component
