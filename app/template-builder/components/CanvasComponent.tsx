@@ -262,7 +262,7 @@ export default function CanvasComponent({ component, parentId }: CanvasComponent
                 className={`relative group ${isDragging ? 'opacity-50' : 'opacity-100'}`}
                 onClick={handleClick}
                 style={inlineStyles}
-                width={component.props.width || '50%'}
+                width={component.props.colSpan ? `${(component.props.colSpan / 12) * 100}%` : (component.props.width || '50%')}
             >
                 {renderOverlays()}
                 {component.children && component.children.length > 0 ? (

@@ -13,9 +13,16 @@ import type { ComponentNode } from '../types';
 
 export default function LayersPanel() {
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const components = useBuilderStore((state) => state.components);
     const selectedId = useBuilderStore((state) => state.selectedId);
     const selectComponent = useBuilderStore((state) => state.selectComponent);
+    const updateComponent = useBuilderStore((state) => state.updateComponent);
+
+    const handleRename = (id: string, newName: string) => {
+        updateComponent(id, { name: newName });
+        setEditingId(null);
+    };
 
     if (isCollapsed) {
         return (
@@ -64,6 +71,9 @@ export default function LayersPanel() {
                                 level={0}
                                 selectedId={selectedId}
                                 onSelect={selectComponent}
+                                editingId={editingId}
+                                onEdit={setEditingId}
+                                onRename={handleRename}
                             />
                         ))}
                     </div>
@@ -76,20 +86,47 @@ export default function LayersPanel() {
 /**
  * Layer Item Component
  */
+/**
+ * Layer Item Component
+ */
 function LayerItem({
     component,
     level,
     selectedId,
     onSelect,
+    editingId,
+    onEdit,
+    onRename,
 }: {
     component: ComponentNode;
     level: number;
     selectedId: string | null;
     onSelect: (id: string | null) => void;
+    editingId: string | null;
+    onEdit: (id: string | null) => void;
+    onRename: (id: string, newName: string) => void;
 }) {
     const [isExpanded, setIsExpanded] = useState(true);
+    const [tempName, setTempName] = useState(component.name);
     const deleteComponent = useBuilderStore((state) => state.deleteComponent);
     const updateComponent = useBuilderStore((state) => state.updateComponent);
+
+    const isEditing = editingId === component.id;
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            onRename(component.id, tempName);
+        } else if (e.key === 'Escape') {
+            onEdit(null);
+            setTempName(component.name);
+        }
+    };
+
+    React.useEffect(() => {
+        if (isEditing) {
+            setTempName(component.name);
+        }
+    }, [isEditing, component.name]);
 
     const hasChildren = component.children && component.children.length > 0;
     const isSelected = selectedId === component.id;
@@ -118,8 +155,8 @@ function LayerItem({
             <div
                 onClick={() => onSelect(component.id)}
                 className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer group transition-all ${isSelected
-                        ? 'bg-purple-500/20 border border-purple-500/50'
-                        : 'hover:bg-gray-800/50 border border-transparent'
+                    ? 'bg-purple-500/20 border border-purple-500/50'
+                    : 'hover:bg-gray-800/50 border border-transparent'
                     }`}
                 style={{ paddingLeft: `${level * 16 + 8}px` }}
             >
@@ -144,16 +181,44 @@ function LayerItem({
                 {/* Icon */}
                 <Icon className={`w-4 h-4 ${isSelected ? 'text-purple-400' : 'text-gray-500'}`} />
 
-                {/* Name */}
-                <span
-                    className={`flex-1 text-sm truncate ${isSelected ? 'text-white font-medium' : 'text-gray-300'
-                        }`}
-                >
-                    {component.name}
-                </span>
+                {/* Name or Input */}
+                {isEditing ? (
+                    <input
+                        type="text"
+                        value={tempName}
+                        onChange={(e) => setTempName(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        onBlur={() => onRename(component.id, tempName)}
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex-1 bg-gray-900 border border-purple-500 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none min-w-0"
+                    />
+                ) : (
+                    <span
+                        onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            onEdit(component.id);
+                        }}
+                        className={`flex-1 text-sm truncate ${isSelected ? 'text-white font-medium' : 'text-gray-300'}`}
+                    >
+                        {component.name}
+                    </span>
+                )}
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {!isEditing && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onEdit(component.id);
+                            }}
+                            className="p-1 hover:bg-gray-700 rounded transition-colors"
+                            title="Rename"
+                        >
+                            <Icons.Pencil className="w-3 h-3 text-gray-400" />
+                        </button>
+                    )}
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
@@ -205,6 +270,9 @@ function LayerItem({
                             level={level + 1}
                             selectedId={selectedId}
                             onSelect={onSelect}
+                            editingId={editingId}
+                            onEdit={onEdit}
+                            onRename={onRename}
                         />
                     ))}
                 </div>

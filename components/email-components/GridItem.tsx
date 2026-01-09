@@ -19,7 +19,11 @@ export const GridItem: React.FC<GridItemProps> = ({
     className = '',
     style = {},
     id,
+    colSpan,
 }) => {
+    // Calculate width based on colSpan if provided
+    const calculatedWidth = colSpan ? `${(colSpan / 12) * 100}%` : width;
+
     const getSpacingStyles = (spacing?: SpacingProps): React.CSSProperties => {
         if (!spacing) return {};
 
@@ -148,7 +152,7 @@ export const GridItem: React.FC<GridItemProps> = ({
         backgroundRepeat: backgroundImage ? 'no-repeat' : undefined,
         borderRadius,
         boxShadow,
-        width: width || '100%',
+        width: calculatedWidth || '100%',
         minWidth: minWidth ? `${minWidth}px` : undefined,
         maxWidth: maxWidth ? `${maxWidth}px` : undefined,
         ...getSpacingStyles(padding),

@@ -101,8 +101,8 @@ export default function StyleControls({ component, updateStyles }: StyleControls
                                         key={align}
                                         onClick={() => handleStyleChange('textAlign', align)}
                                         className={`p-2 rounded transition-all ${styles.textAlign === align
-                                                ? 'bg-purple-500 text-white'
-                                                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                                            ? 'bg-purple-500 text-white'
+                                            : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
                                             }`}
                                         title={align}
                                     >
@@ -130,6 +130,42 @@ export default function StyleControls({ component, updateStyles }: StyleControls
                     value={styles.backgroundColor || '#ffffff'}
                     onChange={(value) => handleStyleChange('backgroundColor', value)}
                 />
+                <InputField
+                    label="Background Image URL"
+                    value={styles.backgroundImage ? styles.backgroundImage.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '') : ''}
+                    onChange={(value) => handleStyleChange('backgroundImage', value ? `url('${value}')` : '')}
+                    placeholder="https://..."
+                />
+                {styles.backgroundImage && (
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-2">Size</label>
+                            <select
+                                value={styles.backgroundSize || 'auto'}
+                                onChange={(e) => handleStyleChange('backgroundSize', e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-purple-500/50"
+                            >
+                                <option value="auto">Auto</option>
+                                <option value="cover">Cover</option>
+                                <option value="contain">Contain</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-2">Position</label>
+                            <select
+                                value={styles.backgroundPosition || 'center'}
+                                onChange={(e) => handleStyleChange('backgroundPosition', e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-purple-500/50"
+                            >
+                                <option value="center">Center</option>
+                                <option value="top">Top</option>
+                                <option value="bottom">Bottom</option>
+                                <option value="left">Left</option>
+                                <option value="right">Right</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
             </Section>
 
             {/* Border Section */}
@@ -164,6 +200,12 @@ export default function StyleControls({ component, updateStyles }: StyleControls
                         label="Width"
                         value={styles.width || 'auto'}
                         onChange={(value) => handleStyleChange('width', value)}
+                        placeholder="auto"
+                    />
+                    <InputField
+                        label="Height"
+                        value={styles.height || 'auto'}
+                        onChange={(value) => handleStyleChange('height', value)}
                         placeholder="auto"
                     />
                     <InputField

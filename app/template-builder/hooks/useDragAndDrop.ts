@@ -37,7 +37,7 @@ export function useDragAndDrop() {
 
             // Special handling for columns
             if (componentType === 'column') {
-                // If dropping over a droppable zone with a parent
+                // If dropping over a droppable zone with a parent (e.g., dropping ONTO a component that accepts children)
                 if (overData?.parentId) {
                     const targetParent = getComponentById(overData.parentId);
 
@@ -45,8 +45,25 @@ export function useDragAndDrop() {
                     if (targetParent?.type === 'section') {
                         parentId = overData.parentId;
                     }
+                    // CRITICAL FIX: If dropping onto a column, put it in the column's parent (the section)
+                    else if (targetParent?.type === 'column') {
+                        // Find the parent of the column (which should be a section)
+                        const findParent = (components: any[], targetId: string, currentParentId: string | null = null): string | null => {
+                            for (const comp of components) {
+                                if (comp.id === targetId) return currentParentId;
+                                if (comp.children) {
+                                    const found = findParent(comp.children, targetId, comp.id);
+                                    if (found !== null) return found;
+                                }
+                            }
+                            return null;
+                        };
+
+                        const state = useBuilderStore.getState();
+                        parentId = findParent(state.components, targetParent.id);
+                    }
                 }
-                // If dropping over a canvas component directly
+                // If dropping over a canvas component directly (that might not be a drop zone itself)
                 else if (overData?.componentId) {
                     const overComponent = getComponentById(overData.componentId);
 

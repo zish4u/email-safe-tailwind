@@ -44,6 +44,7 @@ export interface GridProps extends BaseComponentProps {
 export interface GridItemProps extends BaseComponentProps {
     children: React.ReactNode;
     width?: number | string;
+    colSpan?: number; // 1-12 for grid layout
     minWidth?: number;
     maxWidth?: number;
     flex?: number;

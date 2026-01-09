@@ -131,6 +131,7 @@ export interface SectionComponentProps extends ComponentProps {
 
 export interface ColumnComponentProps extends ComponentProps {
     width?: string; // Percentage or pixels
+    colSpan?: number; // 1-12
 }
 
 export interface SpacerComponentProps extends ComponentProps {

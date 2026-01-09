@@ -13,6 +13,7 @@ import StyleControls from './StyleControls';
 
 export default function PropertiesPanel() {
     const selectedId = useBuilderStore((state) => state.selectedId);
+    const components = useBuilderStore((state) => state.components); // Subscribe to changes
     const getComponentById = useBuilderStore((state) => state.getComponentById);
     const updateProps = useBuilderStore((state) => state.updateProps);
     const updateStyles = useBuilderStore((state) => state.updateStyles);
@@ -63,8 +64,8 @@ export default function PropertiesPanel() {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm transition-all ${activeTab === tab.id
-                                    ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
-                                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                                ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
+                                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
                                 }`}
                         >
                             <tab.icon className="w-4 h-4" />
@@ -131,6 +132,31 @@ function PropertiesContent({
                             </select>
                         </div>
                     </>
+                );
+
+            case 'column':
+                return (
+                    <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-2">
+                            Column Span ({component.props.colSpan || 6}/12)
+                        </label>
+                        <input
+                            type="range"
+                            min="1"
+                            max="12"
+                            step="1"
+                            value={component.props.colSpan || 6}
+                            onChange={(e) => handleChange('colSpan', parseInt(e.target.value))}
+                            className="w-full accent-purple-500 cursor-pointer"
+                        />
+                        <div className="flex justify-between text-gray-500 text-[10px] mt-1">
+                            <span>1</span>
+                            <span>3</span>
+                            <span>6</span>
+                            <span>9</span>
+                            <span>12</span>
+                        </div>
+                    </div>
                 );
 
             case 'image':
@@ -208,10 +234,231 @@ function PropertiesContent({
                     </div>
                 );
 
-            default:
+            case 'section':
                 return (
-                    <div className="text-center text-gray-500 text-sm py-8">
-                        No properties available for this component type
+                    // Section properties
+                    <div>
+                        <div className="mb-4">
+                            <label className="block text-xs font-medium text-gray-400 mb-2">Max Width</label>
+                            <select
+                                value={component.props.maxWidth || '6xl'}
+                                onChange={(e) => handleChange('maxWidth', e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-purple-500/50"
+                            >
+                                <option value="sm">Small (Screen)</option>
+                                <option value="md">Medium (Tablet)</option>
+                                <option value="lg">Large (Desktop Link)</option>
+                                <option value="xl">Extra Large</option>
+                                <option value="2xl">2XL</option>
+                                <option value="4xl">4XL</option>
+                                <option value="6xl">6XL</option>
+                                <option value="full">Full Width</option>
+                            </select>
+                        </div>
+                    </div>
+                );
+
+            case 'social-links':
+                return (
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-2">Align</label>
+                            <div className="grid grid-cols-3 gap-1 bg-gray-800/50 p-1 rounded-lg">
+                                {['left', 'center', 'right'].map((align) => (
+                                    <button
+                                        key={align}
+                                        onClick={() => handleChange('align', align)}
+                                        className={`p-1.5 rounded text-xs capitalize transition-all ${(component.props.align || 'left') === align
+                                            ? 'bg-purple-500 text-white'
+                                            : 'text-gray-400 hover:text-gray-200'
+                                            }`}
+                                    >
+                                        {align}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-2">Icon Size</label>
+                            <select
+                                value={component.props.size || 'md'}
+                                onChange={(e) => handleChange('size', e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-purple-500/50"
+                            >
+                                <option value="sm">Small</option>
+                                <option value="md">Medium</option>
+                                <option value="lg">Large</option>
+                            </select>
+                        </div>
+                        <div className="border-t border-gray-800 pt-4">
+                            <label className="block text-xs font-medium text-gray-400 mb-2">Links</label>
+                            <div className="space-y-2">
+                                {(component.props.links || []).map((link: any, index: number) => (
+                                    <div key={index} className="flex gap-2 items-center bg-gray-900/50 p-2 rounded border border-gray-800">
+                                        <div className="w-6 h-6 shrink-0 flex items-center justify-center bg-gray-700 rounded-full text-[10px] uppercase font-bold text-gray-300">
+                                            {link.platform?.[0] || '?'}
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={link.url}
+                                            onChange={(e) => {
+                                                const newLinks = [...(component.props.links || [])];
+                                                newLinks[index] = { ...newLinks[index], url: e.target.value };
+                                                handleChange('links', newLinks);
+                                            }}
+                                            className="min-w-0 flex-1 bg-transparent text-xs text-gray-300 focus:outline-none"
+                                            placeholder="https://..."
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                const newLinks = [...(component.props.links || [])].filter((_, i) => i !== index);
+                                                handleChange('links', newLinks);
+                                            }}
+                                            className="text-gray-500 hover:text-red-400"
+                                        >
+                                            <Icons.X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                ))}
+                                <button
+                                    onClick={() => {
+                                        const newLinks = [...(component.props.links || []), { platform: 'facebook', url: 'https://' }];
+                                        handleChange('links', newLinks);
+                                    }}
+                                    className="w-full py-1.5 text-xs text-purple-400 border border-dashed border-purple-500/30 rounded hover:bg-purple-500/10 transition-colors"
+                                >
+                                    + Add Link
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+
+            case 'divider':
+                return (
+                    <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-2">Height</label>
+                        <input
+                            type="text"
+                            value={component.props.height || '1px'}
+                            onChange={(e) => handleChange('height', e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-200"
+                        />
+                    </div>
+                );
+
+            case 'section':
+                return (
+                    // Section properties
+                    <div>
+                        <div className="mb-4">
+                            <label className="block text-xs font-medium text-gray-400 mb-2">Max Width</label>
+                            <select
+                                value={component.props.maxWidth || '6xl'}
+                                onChange={(e) => handleChange('maxWidth', e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-purple-500/50"
+                            >
+                                <option value="sm">Small (Screen)</option>
+                                <option value="md">Medium (Tablet)</option>
+                                <option value="lg">Large (Desktop Link)</option>
+                                <option value="xl">Extra Large</option>
+                                <option value="2xl">2XL</option>
+                                <option value="4xl">4XL</option>
+                                <option value="6xl">6XL</option>
+                                <option value="full">Full Width</option>
+                            </select>
+                        </div>
+                    </div>
+                );
+
+            case 'social-links':
+                return (
+                    // Social Links properties
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-2">Align</label>
+                            <div className="grid grid-cols-3 gap-1 bg-gray-800/50 p-1 rounded-lg">
+                                {['left', 'center', 'right'].map((align) => (
+                                    <button
+                                        key={align}
+                                        onClick={() => handleChange('align', align)}
+                                        className={`p-1.5 rounded text-xs capitalize transition-all ${(component.props.align || 'left') === align
+                                            ? 'bg-purple-500 text-white'
+                                            : 'text-gray-400 hover:text-gray-200'
+                                            }`}
+                                    >
+                                        {align}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-2">Icon Size</label>
+                            <select
+                                value={component.props.size || 'md'}
+                                onChange={(e) => handleChange('size', e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-200 focus:outline-none focus:border-purple-500/50"
+                            >
+                                <option value="sm">Small</option>
+                                <option value="md">Medium</option>
+                                <option value="lg">Large</option>
+                            </select>
+                        </div>
+
+                        <div className="border-t border-gray-800 pt-4">
+                            <label className="block text-xs font-medium text-gray-400 mb-2">Links</label>
+                            <div className="space-y-2">
+                                {(component.props.links || []).map((link: any, index: number) => (
+                                    <div key={index} className="flex gap-2 items-center bg-gray-900/50 p-2 rounded border border-gray-800">
+                                        <div className="w-6 h-6 shrink-0 flex items-center justify-center bg-gray-700 rounded-full text-[10px] uppercase font-bold text-gray-300">
+                                            {link.platform?.[0] || '?'}
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={link.url}
+                                            onChange={(e) => {
+                                                const newLinks = [...(component.props.links || [])];
+                                                newLinks[index] = { ...newLinks[index], url: e.target.value };
+                                                handleChange('links', newLinks);
+                                            }}
+                                            className="min-w-0 flex-1 bg-transparent text-xs text-gray-300 focus:outline-none"
+                                            placeholder="https://..."
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                const newLinks = [...(component.props.links || [])].filter((_, i) => i !== index);
+                                                handleChange('links', newLinks);
+                                            }}
+                                            className="text-gray-500 hover:text-red-400"
+                                        >
+                                            <Icons.X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                ))}
+                                <button
+                                    onClick={() => {
+                                        const newLinks = [...(component.props.links || []), { platform: 'facebook', url: 'https://' }];
+                                        handleChange('links', newLinks);
+                                    }}
+                                    className="w-full py-1.5 text-xs text-purple-400 border border-dashed border-purple-500/30 rounded hover:bg-purple-500/10 transition-colors"
+                                >
+                                    + Add Link
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            case 'divider': // Existing case handling fallback or defined elsewhere?
+                return (
+                    <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-2">Height</label>
+                        <input
+                            type="text"
+                            value={component.props.height || '1px'}
+                            onChange={(e) => handleChange('height', e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-sm text-gray-200"
+                        />
                     </div>
                 );
         }

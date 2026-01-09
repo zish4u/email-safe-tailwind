@@ -7,12 +7,13 @@
 'use client';
 
 import React from 'react';
-import { DndContext, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors, useDndContext } from '@dnd-kit/core';
 import ComponentLibrary from './components/ComponentLibrary';
 import Canvas from './components/Canvas';
 import PropertiesPanel from './components/PropertiesPanel';
 import LayersPanel from './components/LayersPanel';
 import Toolbar from './components/Toolbar';
+import { DragPreview } from './components/DragPreview';
 import { useBuilderStore } from './store';
 import { useDragAndDrop } from './hooks/useDragAndDrop';
 
@@ -96,6 +97,24 @@ export default function TemplateBuilderPage() {
                     )}
                 </div>
             </div>
+
+            <ActualDragOverlay />
         </DndContext>
+    );
+}
+
+function ActualDragOverlay() {
+    const { active } = useDndContext();
+    const activeData = active?.data.current;
+
+    return (
+        <DragOverlay dropAnimation={null}>
+            {activeData ? (
+                <DragPreview
+                    type={activeData.componentType as any}
+                    name={activeData.title || (activeData.componentType as string) || 'Component'}
+                />
+            ) : null}
+        </DragOverlay>
     );
 }
